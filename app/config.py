@@ -10,10 +10,23 @@ MODELS_DIR = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)  # Create models directory if it doesn't exist
 
 # Whisper model for transcription
-# Options: "openai/whisper-tiny", "openai/whisper-base", "openai/whisper-small"
-# For CPU: Use "openai/whisper-tiny" for < 3s processing (recommended)
-# For GPU: Use "openai/whisper-base" for < 3s processing (recommended)
-MODEL_TRANSCRIBE = "openai/whisper-base"  # Optimized for CPU - change to "whisper-base" if using GPU
+# Options for accuracy (best to worst):
+#   "distil-whisper/distil-large-v2" - BEST BALANCE: High accuracy + fast (RECOMMENDED)
+#   "openai/whisper-large-v3" - HIGHEST ACCURACY: Best quality, slower
+#   "openai/whisper-medium" - High accuracy, good speed
+#   "openai/whisper-small" - Good accuracy, fast
+#   "openai/whisper-base" - Good balance, fast
+#   "openai/whisper-tiny" - Fastest, lower accuracy
+#
+# For < 3s requirement with high accuracy: Use "distil-whisper/distil-large-v2"
+# For < 3s requirement on CPU, use smaller model
+# For GPU, can use larger model for better accuracy
+MODEL_TRANSCRIBE = "openai/whisper-small"  # Better balance for CPU: Good accuracy + faster than large-v2
+# Alternative options:
+# "openai/whisper-base" - Fastest, lower accuracy
+# "openai/whisper-small" - Good balance (current)
+# "openai/whisper-medium" - Better accuracy, slower
+# "distil-whisper/distil-large-v2" - Best accuracy but slower on CPU
 
 # Local cache directory for models (stored in project)
 MODEL_CACHE_DIR = str(MODELS_DIR / "cache")

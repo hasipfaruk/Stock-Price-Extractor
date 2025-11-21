@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import List, Optional
 import io
 from .models.transcribe import transcribe
-from .models.extract import extract_with_regex
+from .models.extract import extract_with_regex, extract_detailed
+from .models.llm_extract import extract_with_long_prompt
 from .models.model_manager import (
     list_available_models,
     save_uploaded_model,
@@ -29,6 +30,11 @@ class ExtractResponse(BaseModel):
     price: str | None
     transcript: str
     timings: dict
+    standardized_quote: str | None = None
+    index_name: str | None = None
+    change: str | None = None
+    change_percent: str | None = None
+    session: str | None = None
 
 
 class BatchExtractResponse(BaseModel):
@@ -55,7 +61,10 @@ async def health_check():
 async def extract_price(
     file: UploadFile = File(...),
     model_name: Optional[str] = Form(None),
-    model_path: Optional[str] = Form(None)
+    model_path: Optional[str] = Form(None),
+    use_llm: Optional[bool] = Form(False),
+    prompt_file: Optional[str] = Form(None),
+    prompt_text: Optional[str] = Form(None)
 ):
     """
     Extract stock price from a single audio file
@@ -80,7 +89,42 @@ async def extract_price(
         if not transcript:
             raise HTTPException(status_code=400, detail="Failed to transcribe audio")
         
-        # Extract
+        # Extract using LLM with long prompt if requested
+        if use_llm and (prompt_file or prompt_text):
+            llm_result = extract_with_long_prompt(
+                transcript,
+                prompt_file=prompt_file,
+                prompt_text=prompt_text
+            )
+            if llm_result:
+                return {
+                    'index': llm_result.get('price'),
+                    'price': llm_result.get('price'),
+                    'index_name': llm_result.get('index_name'),
+                    'change': llm_result.get('change'),
+                    'change_percent': llm_result.get('change_percent'),
+                    'session': llm_result.get('session'),
+                    'standardized_quote': llm_result.get('standardized_quote'),
+                    'transcript': transcript,
+                    'timings': {'transcription_s': trans_time}
+                }
+        
+        # Extract detailed information using regex
+        detailed = extract_detailed(transcript)
+        if detailed:
+            return {
+                'index': detailed.get('price'),
+                'price': detailed.get('price'),
+                'index_name': detailed.get('index_name'),
+                'change': detailed.get('change'),
+                'change_percent': detailed.get('change_percent'),
+                'session': detailed.get('session'),
+                'standardized_quote': detailed.get('standardized_quote'),
+                'transcript': transcript,
+                'timings': {'transcription_s': trans_time}
+            }
+        
+        # Fallback to simple extraction
         extraction = extract_with_regex(transcript)
         if extraction:
             index, price = extraction
@@ -90,6 +134,8 @@ async def extract_price(
         return {
             'index': index,
             'price': price,
+            'index_name': index,
+            'standardized_quote': f"{index} @ {price}" if index and price else None,
             'transcript': transcript,
             'timings': {'transcription_s': trans_time}
         }
@@ -138,20 +184,38 @@ async def extract_batch(
             if not transcript:
                 raise Exception("Failed to transcribe")
             
-            # Extract
-            extraction = extract_with_regex(transcript)
-            if extraction:
-                index, price = extraction
+            # Extract detailed information
+            detailed = extract_detailed(transcript)
+            if detailed:
+                results.append({
+                    'filename': file.filename,
+                    'index': detailed.get('price'),
+                    'price': detailed.get('price'),
+                    'index_name': detailed.get('index_name'),
+                    'change': detailed.get('change'),
+                    'change_percent': detailed.get('change_percent'),
+                    'session': detailed.get('session'),
+                    'standardized_quote': detailed.get('standardized_quote'),
+                    'transcript': transcript,
+                    'timings': {'transcription_s': trans_time} if trans_time else {}
+                })
             else:
-                index, price = None, None
-            
-            results.append({
-                'filename': file.filename,
-                'index': index,
-                'price': price,
-                'transcript': transcript,
-                'timings': {'transcription_s': trans_time} if trans_time else {}
-            })
+                # Fallback
+                extraction = extract_with_regex(transcript)
+                if extraction:
+                    index, price = extraction
+                else:
+                    index, price = None, None
+                
+                results.append({
+                    'filename': file.filename,
+                    'index': index,
+                    'price': price,
+                    'index_name': index,
+                    'standardized_quote': f"{index} @ {price}" if index and price else None,
+                    'transcript': transcript,
+                    'timings': {'transcription_s': trans_time} if trans_time else {}
+                })
             successful += 1
             
         except Exception as e:
