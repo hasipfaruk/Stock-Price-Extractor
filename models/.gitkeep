@@ -1,0 +1,4 @@
+# This directory stores downloaded Whisper models
+# Models will be automatically downloaded here on first use
+# Size: ~150 MB for whisper-base, ~75 MB for whisper-tiny
+
