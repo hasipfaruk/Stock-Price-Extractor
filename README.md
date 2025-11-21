@@ -275,12 +275,6 @@ Run the CLI tool with `--verbose` to see processing times:
 python extract_price.py audio.wav --verbose
 ```
 
-## 📝 License
-
-This project uses open-source models:
-- Whisper: MIT License
-- Transformers: Apache 2.0
-
 ## 🤝 Contributing
 
 Contributions welcome! Feel free to submit issues or pull requests.
