@@ -3,19 +3,47 @@ Streamlit Web App for Stock Index Price Extractor
 Simple interface: Upload audio + prompt = Get results
 """
 
+# Suppress warnings before any imports
+import warnings
+import os
+import logging
+
+# Set environment variables to suppress transformers warnings
+os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+# Disable flash-attention to avoid window_size compatibility issues
+os.environ["DISABLE_FLASH_ATTN"] = "1"
+# Prevent transformers from auto-detecting flash-attention
+os.environ["TRANSFORMERS_USE_FLASH_ATTENTION_2"] = "0"
+
+# Suppress specific warning messages
+warnings.filterwarnings("ignore", message=".*flash-attention.*")
+warnings.filterwarnings("ignore", message=".*window_size.*")
+warnings.filterwarnings("ignore", message=".*attention mask.*")
+warnings.filterwarnings("ignore", message=".*pad token.*")
+warnings.filterwarnings("ignore", message=".*pad_token.*")
+warnings.filterwarnings("ignore", message=".*eos_token.*")
+warnings.filterwarnings("ignore", message=".*cannot be inferred.*")
+
+# Suppress transformers logging
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
+
 import streamlit as st
 import tempfile
-import os
 import json
 from pathlib import Path
 import sys
+
+# Initialize session state for model caching
+if 'llm_model_loaded' not in st.session_state:
+    st.session_state.llm_model_loaded = False
 
 # Add project root to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from app.models.transcribe import transcribe
-from app.models.extract import extract_detailed
 from app.models.llm_extract import extract_with_long_prompt
 
 # Page config
@@ -27,29 +55,32 @@ st.set_page_config(
 
 # Title
 st.title("📊 Stock Index Price Extractor")
-st.markdown("Extract stock index prices from audio recordings using AI")
+st.markdown("Extract stock index prices from audio recordings using **LLM (Large Language Model)**")
+st.info("🤖 **LLM Mode**: This app uses LLM to handle complex audio with multiple information. A prompt is required.")
 
 # Sidebar
 with st.sidebar:
     st.header("⚙️ Settings")
     
-    extraction_method = st.radio(
-        "Extraction Method",
-        ["Auto (LLM if prompt provided)", "Regex (Fast)", "LLM (Advanced)"],
-        help="Auto: Uses LLM if prompt is provided, otherwise uses regex"
-    )
+    st.info("🤖 **LLM Mode Only**\n\nThis app uses LLM for extraction to handle complex audio with multiple information.")
     
     st.markdown("---")
     st.markdown("### 📝 About")
     st.markdown("""
     **How it works:**
     1. Upload audio file (5-10 seconds)
-    2. Provide prompt (optional for LLM)
-    3. Get extracted stock prices
+    2. **Provide prompt** (required)
+    3. LLM extracts stock prices
     
-    **Methods:**
-    - **Regex**: Fast (< 3s), works automatically
-    - **LLM**: Advanced, uses your custom prompt
+    **Why LLM?**
+    - Handles complex audio with multiple information
+    - Uses your custom extraction rules
+    - More accurate for detailed transcripts
+    
+    **Model Caching:**
+    - First run: Downloads ~2GB model (5-10 min)
+    - After that: Uses cached model (fast!)
+    - Model stored in: `models/cache/`
     """)
 
 # Main content
@@ -68,13 +99,13 @@ with col1:
         st.success(f"✅ File uploaded: {audio_file.name}")
 
 with col2:
-    st.header("📝 Prompt (Optional for LLM)")
+    st.header("📝 Prompt (Required)")
     
     prompt_method = st.radio(
         "Prompt Input",
         ["Text Input", "File Upload"],
         horizontal=True,
-        help="Provide prompt as text or upload a file"
+        help="Provide prompt as text or upload a file (required for LLM extraction)"
     )
     
     prompt_text = None
@@ -82,16 +113,18 @@ with col2:
     
     if prompt_method == "Text Input":
         prompt_text = st.text_area(
-            "Enter your extraction prompt",
+            "Enter your extraction prompt *",
             height=200,
-            help="Enter instructions for the LLM on how to extract stock prices. Leave empty to use regex.",
-            placeholder="Example:\nExtract stock index price information from the transcript.\nReturn JSON with index_name, price, change, change_percent."
+            help="Enter detailed instructions for the LLM on how to extract stock prices from complex audio. This is REQUIRED.",
+            placeholder="Example:\nYou are an expert financial data extractor. Extract stock index price information from the transcript.\n\nExtract:\n1. Index name (e.g., S&P 500, NASDAQ, DOW, DAX, VIX)\n2. Current price\n3. Change in points\n4. Change percentage\n5. Session context\n\nReturn JSON with index_name, price, change, change_percent, session, standardized_quote."
         )
+        if not prompt_text or prompt_text.strip() == "":
+            st.warning("⚠️ Prompt is required for LLM extraction")
     else:
         prompt_file_upload = st.file_uploader(
-            "Upload prompt file",
+            "Upload prompt file *",
             type=['txt', 'md'],
-            help="Upload a text file with your extraction prompt (can be 500+ lines)"
+            help="Upload a text file with your extraction prompt (can be 500+ lines). This is REQUIRED."
         )
         if prompt_file_upload:
             # Save uploaded file temporarily
@@ -106,6 +139,8 @@ with col2:
             except Exception as e:
                 st.error(f"Error reading prompt file: {e}")
                 prompt_file = None
+        else:
+            st.warning("⚠️ Please upload a prompt file")
 
 # Process button
 st.markdown("---")
@@ -116,18 +151,21 @@ if process_button:
         st.error("❌ Please upload an audio file first!")
         st.stop()
     
-    # Determine extraction method
-    use_llm = False
-    if extraction_method == "LLM (Advanced)":
-        use_llm = True
-        if not prompt_text and not prompt_file:
-            st.error("❌ LLM mode requires a prompt! Please provide prompt text or file.")
-            st.stop()
-    elif extraction_method == "Auto (LLM if prompt provided)":
-        use_llm = (prompt_text is not None and prompt_text.strip() != "") or prompt_file is not None
+    # Check prompt is provided (required for LLM)
+    if not prompt_text and not prompt_file:
+        st.error("❌ Prompt is required! Please provide prompt text or upload a prompt file.")
+        st.stop()
+    
+    if prompt_method == "Text Input" and (not prompt_text or prompt_text.strip() == ""):
+        st.error("❌ Please enter a prompt in the text area!")
+        st.stop()
+    
+    if prompt_method == "File Upload" and not prompt_file:
+        st.error("❌ Please upload a prompt file!")
+        st.stop()
     
     # Show processing status
-    with st.spinner("🔄 Processing audio..."):
+    with st.spinner("🔄 Processing audio with LLM..."):
         # Save audio to temp file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_audio:
             tmp_audio.write(audio_file.read())
@@ -149,18 +187,23 @@ if process_button:
                 st.error("❌ Failed to transcribe audio")
                 st.stop()
             
-            # Extract
-            if use_llm:
-                st.info("🤖 Using LLM for extraction...")
-                if prompt_file:
-                    extraction = extract_with_long_prompt(transcript, prompt_file=prompt_file)
-                else:
-                    extraction = extract_with_long_prompt(transcript, prompt_text=prompt_text)
-                method_used = "LLM"
+            # Extract using LLM (always)
+            if not st.session_state.llm_model_loaded:
+                st.info("🤖 Loading LLM model (first time only, ~2GB download)...")
+                st.warning("⏳ This may take 5-10 minutes on first run. Model will be cached for future use.")
             else:
-                st.info("⚡ Using regex for extraction...")
-                extraction = extract_detailed(transcript)
-                method_used = "Regex"
+                st.info("🤖 Using LLM for extraction...")
+            
+            if prompt_file:
+                extraction = extract_with_long_prompt(transcript, prompt_file=prompt_file)
+            else:
+                extraction = extract_with_long_prompt(transcript, prompt_text=prompt_text)
+            
+            # Mark model as loaded
+            if extraction is not None:
+                st.session_state.llm_model_loaded = True
+            
+            method_used = "LLM"
             
             # Display results
             st.markdown("---")
@@ -245,9 +288,10 @@ if process_button:
                     mime="application/json"
                 )
             else:
-                st.warning("⚠️ No extraction possible. Try using LLM with a custom prompt.")
+                st.warning("⚠️ No extraction possible. Please check your prompt and try again.")
                 st.markdown("**Transcript:**")
                 st.text(transcript)
+                st.info("💡 Tip: Make sure your prompt clearly instructs the LLM on what to extract and in what format.")
         
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
@@ -265,7 +309,7 @@ if process_button:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray;'>
-    <p>Stock Index Price Extractor | Powered by OpenAI Whisper & Microsoft Phi-3</p>
+    <p>Stock Index Price Extractor | 100% LLM-Powered (Llama 2) + Whisper ASR</p>
 </div>
 """, unsafe_allow_html=True)
 

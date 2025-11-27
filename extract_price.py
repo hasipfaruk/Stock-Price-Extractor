@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Standalone CLI tool for extracting stock index prices from audio recordings
-Can be used directly from command line without running a server
-Works with any audio source containing stock market information
+Standalone CLI tool for extracting stock index prices from audio recordings using LLM
+100% LLM-powered extraction - No regex fallback
+Uses Llama 2 for accurate price extraction
 """
 
 import argparse
@@ -15,33 +15,29 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from app.models.transcribe import transcribe
-from app.models.extract import extract_with_regex, extract_detailed
 from app.models.llm_extract import extract_with_long_prompt
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Extract stock index prices from audio recordings",
+        description="Extract stock index prices from audio recordings using LLM (100% LLM-powered, no regex)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic usage
-  python extract_price.py audio.wav
+  # With prompt file (REQUIRED for LLM extraction)
+  python extract_price.py audio.wav --prompt-file prompt.txt
+  
+  # With prompt text (REQUIRED for LLM extraction)
+  python extract_price.py audio.wav --prompt-text "Extract stock prices from the transcript..."
   
   # JSON output
-  python extract_price.py audio.wav --json
+  python extract_price.py audio.wav --prompt-file prompt.txt --json
   
   # Verbose output with timing
-  python extract_price.py audio.wav --verbose
+  python extract_price.py audio.wav --prompt-file prompt.txt --verbose
   
   # Save to file
-  python extract_price.py audio.wav --output result.json
-  
-  # Use LLM extraction with prompt file
-  python extract_price.py audio.wav --use-llm --prompt-file prompt.txt
-  
-  # Use LLM extraction with prompt text
-  python extract_price.py audio.wav --use-llm --prompt-text "Extract stock prices..."
+  python extract_price.py audio.wav --prompt-file prompt.txt --output result.json
         """
     )
     
@@ -76,21 +72,16 @@ Examples:
     )
     
     parser.add_argument(
-        "--use-llm",
-        action="store_true",
-        help="Use LLM for extraction instead of regex (requires --prompt-file or --prompt-text)"
-    )
-    
-    parser.add_argument(
         "--prompt-file",
         type=str,
-        help="Path to prompt file (for LLM extraction)"
+        required=True,
+        help="Path to prompt file (REQUIRED - provides extraction instructions to LLM)"
     )
     
     parser.add_argument(
         "--prompt-text",
         type=str,
-        help="Prompt text directly (for LLM extraction)"
+        help="Alternative: provide prompt text directly instead of --prompt-file"
     )
     
     args = parser.parse_args()
@@ -119,94 +110,42 @@ Examples:
             print("Error: Failed to transcribe audio", file=sys.stderr)
             sys.exit(1)
         
-        # Extract price if requested
+        # Extract price using LLM (only method available)
         if args.transcript_only:
             result = {
                 "transcript": transcript,
                 "timing": {"transcription_s": trans_time} if trans_time else {}
             }
         else:
-            # Use LLM if requested
-            if args.use_llm:
-                if not args.prompt_file and not args.prompt_text:
-                    print("Error: --use-llm requires --prompt-file or --prompt-text", file=sys.stderr)
-                    sys.exit(1)
-                
-                if args.verbose:
-                    print("Using LLM for extraction...", file=sys.stderr)
-                
-                llm_result = extract_with_long_prompt(
-                    transcript,
-                    prompt_file=args.prompt_file,
-                    prompt_text=args.prompt_text
-                )
-                
-                if llm_result:
-                    result = {
-                        "index_name": llm_result.get('index_name'),
-                        "price": llm_result.get('price'),
-                        "change": llm_result.get('change'),
-                        "change_percent": llm_result.get('change_percent'),
-                        "session": llm_result.get('session'),
-                        "standardized_quote": llm_result.get('standardized_quote'),
-                        "transcript": transcript,
-                        "timing": {"transcription_s": trans_time} if trans_time else {},
-                        "extraction_method": "LLM"
-                    }
-                else:
-                    print("Warning: LLM extraction failed, falling back to regex", file=sys.stderr)
-                    # Fall through to regex extraction
-                    extraction = extract_detailed(transcript)
-                    if extraction:
-                        result = {
-                            "index_name": extraction.get('index_name'),
-                            "price": extraction.get('price'),
-                            "change": extraction.get('change'),
-                            "change_percent": extraction.get('change_percent'),
-                            "session": extraction.get('session'),
-                            "standardized_quote": extraction.get('standardized_quote'),
-                            "transcript": transcript,
-                            "timing": {"transcription_s": trans_time} if trans_time else {},
-                            "extraction_method": "regex"
-                        }
-                    else:
-                        result = {
-                            "index": None,
-                            "price": None,
-                            "transcript": transcript,
-                            "timing": {"transcription_s": trans_time} if trans_time else {},
-                            "extraction_method": "regex"
-                        }
-            else:
-                # Use regex extraction (default)
-                extraction = extract_detailed(transcript)
-                if extraction:
-                    result = {
-                        "index_name": extraction.get('index_name'),
-                        "price": extraction.get('price'),
-                        "change": extraction.get('change'),
-                        "change_percent": extraction.get('change_percent'),
-                        "session": extraction.get('session'),
-                        "standardized_quote": extraction.get('standardized_quote'),
-                        "transcript": transcript,
-                        "timing": {"transcription_s": trans_time} if trans_time else {},
-                        "extraction_method": "regex"
-                    }
-                else:
-                    # Fallback to simple extraction
-                    simple_extraction = extract_with_regex(transcript)
-                    if simple_extraction:
-                        index, price = simple_extraction
-                    else:
-                        index, price = None, None
-                    
-                    result = {
-                        "index": index,
-                        "price": price,
-                        "transcript": transcript,
-                        "timing": {"transcription_s": trans_time} if trans_time else {},
-                        "extraction_method": "regex"
-                    }
+            # 100% LLM-powered extraction (NO REGEX FALLBACK)
+            if args.verbose:
+                print("Using Llama 2 LLM for extraction (100% LLM-powered)...", file=sys.stderr)
+            
+            llm_result = extract_with_long_prompt(
+                transcript,
+                prompt_file=args.prompt_file if not args.prompt_text else None,
+                prompt_text=args.prompt_text
+            )
+            
+            if not llm_result:
+                print("Error: LLM extraction failed - no valid JSON returned from LLM", file=sys.stderr)
+                print("Ensure your prompt is correct and the LLM can parse the transcript", file=sys.stderr)
+                sys.exit(1)
+            
+            # Build result with LLM extraction only
+            result = {
+                "index_name": llm_result.get('index_name'),
+                "price": llm_result.get('price'),
+                "change": llm_result.get('change'),
+                "change_percent": llm_result.get('change_percent'),
+                "session": llm_result.get('session'),
+                "standardized_quote": llm_result.get('standardized_quote'),
+                "transcript": transcript,
+                "timing": {"transcription_s": trans_time} if trans_time else {},
+                "extraction_method": "LLM (Llama 2)",
+                "note": "100% LLM-powered extraction. No regex fallback.",
+                "model": "meta-llama/Llama-2-7b-chat-hf"
+            }
         
         # Output results
         if args.output:
@@ -227,7 +166,7 @@ Examples:
         if trans_time and trans_time > 3.0:
             print(f"\n  Warning: Processing took {trans_time:.2f}s (target: < 3s)", file=sys.stderr)
         elif trans_time:
-            print(f"\n Processing completed in {trans_time:.2f}s", file=sys.stderr)
+            print(f"\n  Processing completed in {trans_time:.2f}s", file=sys.stderr)
         
     except KeyboardInterrupt:
         print("\nInterrupted by user", file=sys.stderr)
@@ -242,25 +181,22 @@ Examples:
 
 def print_result(result: dict, verbose: bool = False):
     """Print results in human-readable format"""
-    print("\n" + "="*50)
-    print("STOCK PRICE EXTRACTION RESULTS")
-    if result.get('extraction_method'):
-        print(f"Method: {result['extraction_method'].upper()}")
-    print("="*50)
+    print("\n" + "="*60)
+    print("STOCK PRICE EXTRACTION RESULTS (100% LLM-POWERED)")
+    print("="*60)
     
-    # Handle both old format (index/price) and new format (index_name/price)
-    index = result.get('index_name') or result.get('index')
+    index = result.get('index_name')
     price = result.get('price')
     
     if index:
         print(f"\n[INDEX] Index: {index}")
     else:
-        print("\n[INDEX] Index: Not found")
+        print("\n[INDEX] Index: Not extracted by LLM")
     
     if price:
         print(f"[PRICE] Price: {price}")
     else:
-        print("[PRICE] Price: Not found")
+        print("[PRICE] Price: Not extracted by LLM")
     
     if result.get('change'):
         print(f"[CHANGE] Change: {result['change']}")
@@ -279,9 +215,12 @@ def print_result(result: dict, verbose: bool = False):
         print(f"   {result.get('transcript', 'N/A')}")
         
         if result.get('timing', {}).get('transcription_s'):
-            print(f"\n[TIME] Processing Time: {result['timing']['transcription_s']:.3f}s")
+            print(f"\n[TIME] Total Processing Time: {result['timing']['transcription_s']:.3f}s")
     
-    print("="*50 + "\n")
+    print(f"\n[EXTRACTION METHOD] {result.get('extraction_method', 'LLM')}")
+    print(f"[MODEL] {result.get('model', 'meta-llama/Llama-2-7b-chat-hf')}")
+    print(f"[NOTE] {result.get('note', 'N/A')}")
+    print("="*60 + "\n")
 
 
 if __name__ == "__main__":

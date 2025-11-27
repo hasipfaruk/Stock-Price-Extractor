@@ -42,11 +42,9 @@ Thumbs.db
 *.log
 /tmp/
 *.wav
-!app/tests/sample_audio.wav
 
-# Model cache - models are stored in project/models/ directory
-# Models are large and should not be committed to git
-models/cache/
+# Streamlit cache
+.streamlit/
 
 # Test audio files
 audios/

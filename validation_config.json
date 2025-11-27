@@ -1,0 +1,38 @@
+{
+  "prompt_file": "example_prompt.txt",
+  "test_cases": [
+    {
+      "name": "Example 1: S&P 500 Morning",
+      "audio": "sample_audio_1.wav",
+      "expected": {
+        "index_name": "S&P 500",
+        "price": "5048.13",
+        "change": "-12.45",
+        "change_percent": "-0.25",
+        "session": "Morning"
+      }
+    },
+    {
+      "name": "Example 2: NASDAQ Afternoon",
+      "audio": "sample_audio_2.wav",
+      "expected": {
+        "index_name": "NASDAQ",
+        "price": "15892.50",
+        "change": "+45.20",
+        "change_percent": "+0.28",
+        "session": "Afternoon"
+      }
+    },
+    {
+      "name": "Example 3: DAX European",
+      "audio": "sample_audio_3.wav",
+      "expected": {
+        "index_name": "DAX",
+        "price": "18750.65",
+        "change": "-125.30",
+        "change_percent": "-0.67",
+        "session": "European"
+      }
+    }
+  ]
+}
