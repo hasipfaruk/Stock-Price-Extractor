@@ -2,13 +2,13 @@
 
 A powerful, **100% open-source** solution for extracting stock index price information from audio recordings using **Llama 2** LLM and **Whisper Large-v3** ASR. Designed to handle complex audio with multiple information. Works with any audio source containing stock market information.
 
-## 📋 Recent Updates (Phase 4)
+## 📋 Recent Updates (Phase 1)
 
 ✅ **100% LLM-Only Enforcement** - Regex extraction completely removed, LLM mandatory  
 ✅ **Testing Infrastructure** - Accuracy and latency validation tools included  
 ✅ **Comprehensive Documentation** - Complete guides for deployment and validation  
 
-**See [PHASE4_COMPLETE.md](PHASE4_COMPLETE.md) for Phase 4 details**
+**See [PHASE4_COMPLETE.md](PHASE4_COMPLETE.md) for Phase 1 details**
 
 ## 🔒 Client Requirements Compliance
 
