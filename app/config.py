@@ -33,12 +33,12 @@ VLLM_MAX_MODEL_LEN = 2048  # Reduced for faster processing (sufficient for short
 VLLM_MAX_TOKENS = 150  # Limit output tokens for faster generation
 
 # Mistral model configuration
-# Using Mistral instruction-tuned models (7B or Mixtral based on GPU memory)
-LLM_MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"  # Default: 7B model
-# Alternative options:
-# "mistralai/Mistral-7B-Instruct-v0.1" - Older version
+# Using smallest Mistral model (3B) for fastest processing and lowest memory usage
+LLM_MODEL_NAME = "mistralai/Mistral-3B"  # Smallest: 3B model (fastest, ~6GB)
+# If above model not available, try these alternatives (in order):
+# "mistralai/Mistral-3B" - Base 3B model (if instruct version unavailable)
+# "mistralai/Mistral-7B-Instruct-v0.2" - Larger 7B model (slower, ~14GB)
 # "mistralai/Mixtral-8x7B-Instruct-v0.1" - Mixtral (requires more GPU memory, ~47GB)
-# "mistralai/Mistral-7B-Instruct-v0.3" - Latest version (if available)
 
 # Processing settings
 MAX_AUDIO_LENGTH = 10  # seconds
@@ -47,8 +47,8 @@ SAMPLE_RATE = 16000
 # CPU-specific optimizations
 USE_CPU_OPTIMIZATIONS = (DEVICE == "cpu")
 
-# Performance targets
+# Performance targets (optimized for 3B model - should be even faster!)
 TARGET_LATENCY_SECONDS = 6.0  # End-to-end latency target (<6s)
 TARGET_TRANSCRIBE_SECONDS = 2.0  # Transcription target (<2s)
-TARGET_LLM_SECONDS = 3.0  # LLM extraction target (<3s)
+TARGET_LLM_SECONDS = 2.0  # LLM extraction target (<2s with 3B model - faster!)
 

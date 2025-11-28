@@ -48,8 +48,9 @@ def _load_vllm_model(model_name: str = None):
         try:
             from vllm import LLM
             
-            print(f"Loading Mistral model with vLLM: {model_id}")
+            print(f"Loading Mistral 3B model with vLLM: {model_id}")
             print("This may take a few minutes on first run...")
+            print("💡 Using smallest model (3B) for fastest processing (~6GB memory)")
             
             # Configure vLLM for optimal speed (<6s target)
             vllm_kwargs = {
@@ -95,8 +96,9 @@ def _load_transformers_model(model_name: str = None):
             from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
             
-            print(f"Loading Mistral model with transformers: {model_id}")
+            print(f"Loading Mistral 3B model with transformers: {model_id}")
             print("This may take a few minutes on first run...")
+            print("💡 Using smallest model (3B) for fastest processing (~6GB memory)")
             
             # Load tokenizer
             _transformers_tokenizer = AutoTokenizer.from_pretrained(
