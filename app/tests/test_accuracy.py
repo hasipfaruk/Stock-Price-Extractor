@@ -80,7 +80,7 @@ class AccuracyTester:
             
             # Check if extraction succeeded
             if not extraction:
-                self.log(f"  ❌ FAILED: Extraction returned None", "ERROR")
+                self.log(f"   FAILED: Extraction returned None", "ERROR")
                 return False, {
                     "test_name": test_name,
                     "status": "FAILED",
@@ -125,21 +125,21 @@ class AccuracyTester:
                         "expected": expected_value,
                         "extracted": extracted_value
                     })
-                    self.log(f"  ❌ Field '{key}': expected '{expected_value}', got '{extracted_value}'", "WARN")
+                    self.log(f"   Field '{key}': expected '{expected_value}', got '{extracted_value}'", "WARN")
                 else:
-                    self.log(f"  ✅ Field '{key}': {extracted_value}", "DEBUG")
+                    self.log(f"   Field '{key}': {extracted_value}", "DEBUG")
             
             if passed:
-                self.log(f"  ✅ PASSED: {test_name}", "SUCCESS")
+                self.log(f"   PASSED: {test_name}", "SUCCESS")
             else:
-                self.log(f"  ⚠️  PARTIAL: Some fields mismatched", "WARN")
+                self.log(f"    PARTIAL: Some fields mismatched", "WARN")
                 result["mismatches"] = mismatches
             
             result["accuracy"] = passed
             return passed, result
             
         except Exception as e:
-            self.log(f"  ❌ FAILED: {str(e)}", "ERROR")
+            self.log(f"   FAILED: {str(e)}", "ERROR")
             return False, {
                 "test_name": test_name,
                 "status": "ERROR",
@@ -172,7 +172,7 @@ class AccuracyTester:
             
             # Check if audio file exists
             if not Path(audio_path).exists():
-                self.log(f"  ❌ Audio file not found: {audio_path}", "ERROR")
+                self.log(f"   Audio file not found: {audio_path}", "ERROR")
                 results.append({
                     "test_name": test_name,
                     "status": "SKIPPED",
@@ -194,7 +194,7 @@ class AccuracyTester:
             
             if not result.get('latency_ok', False):
                 latency_violations += 1
-                self.log(f"  ⚠️  Latency warning: {result['timing']['total_s']:.3f}s (target: <3s)", "WARN")
+                self.log(f"    Latency warning: {result['timing']['total_s']:.3f}s (target: <3s)", "WARN")
         
         summary = {
             "total_tests": len(test_cases),
@@ -323,8 +323,8 @@ def demo_test():
     print("ACCURACY TEST DEMO")
     print("="*70 + "\n")
     
-    print("ℹ️  This demo shows how to use the test harness for accuracy validation")
-    print("ℹ️  To run actual tests, provide audio files and expected extraction data\n")
+    print("ℹ  This demo shows how to use the test harness for accuracy validation")
+    print("ℹ  To run actual tests, provide audio files and expected extraction data\n")
     
     # Example test case structure
     example_test_case = {

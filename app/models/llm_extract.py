@@ -63,13 +63,13 @@ def _load_vllm_model(model_name: str = None):
             )
             
             _current_model_name = model_id
-            print("✅ vLLM model loaded successfully!")
+            print(" vLLM model loaded successfully!")
             
         except ImportError:
-            print("⚠️ vLLM not available, falling back to transformers")
+            print(" vLLM not available, falling back to transformers")
             return None
         except Exception as e:
-            print(f"❌ Error loading vLLM model: {e}")
+            print(f" Error loading vLLM model: {e}")
             return None
     
     return _vllm_llm
@@ -122,10 +122,10 @@ def _load_transformers_model(model_name: str = None):
             
             _transformers_model.eval()
             _current_model_name = model_id
-            print("✅ Transformers model loaded successfully!")
+            print(" Transformers model loaded successfully!")
             
         except Exception as e:
-            print(f"❌ Error loading transformers model: {e}")
+            print(f" Error loading transformers model: {e}")
             return None, None
     
     return _transformers_model, _transformers_tokenizer
@@ -204,11 +204,11 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
                     # Normalize and validate
                     normalized = validate_and_normalize_extraction(extracted_data)
                     elapsed = time.time() - start_time
-                    print(f"⚡ LLM extraction completed in {elapsed:.2f}s")
+                    print(f" LLM extraction completed in {elapsed:.2f}s")
                     return normalized
                     
             except Exception as e:
-                print(f"⚠️ vLLM inference error: {e}, falling back to transformers")
+                print(f" vLLM inference error: {e}, falling back to transformers")
     
     # Fallback to transformers
     model, tokenizer = _load_transformers_model(model_name)
@@ -255,11 +255,11 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
             # Normalize and validate
             normalized = validate_and_normalize_extraction(extracted_data)
             elapsed = time.time() - start_time
-            print(f"⚡ LLM extraction completed in {elapsed:.2f}s")
+            print(f" LLM extraction completed in {elapsed:.2f}s")
             return normalized
             
     except Exception as e:
-        print(f"❌ Error during LLM extraction: {e}")
+        print(f" Error during LLM extraction: {e}")
         return None
     
     return None
@@ -283,7 +283,7 @@ def _parse_json_response(response: str) -> Optional[Dict]:
             extracted_data = json.loads(json_str)
             return extracted_data
         except json.JSONDecodeError as e:
-            print(f"⚠️ JSON parsing error: {e}")
+            print(f" JSON parsing error: {e}")
             # Try to extract key-value pairs manually
             return _extract_key_value_pairs(response)
     

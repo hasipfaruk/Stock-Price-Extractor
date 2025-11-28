@@ -83,20 +83,49 @@ with st.sidebar:
     - Model stored in: `models/cache/`
     """)
 
+# Processing mode selection
+st.markdown("### 🎯 Choose Processing Mode")
+mode_col1, mode_col2 = st.columns([1, 1])
+
+with mode_col1:
+    processing_mode = st.radio(
+        "Processing Mode",
+        ["Single File", "Batch (Multiple Files)"],
+        horizontal=True,
+        help="Process one file at a time or upload multiple files"
+    )
+
 # Main content
 col1, col2 = st.columns([1, 1])
 
 with col1:
     st.header("📁 Upload Audio")
-    audio_file = st.file_uploader(
-        "Choose audio file",
-        type=['wav', 'mp3', 'flac', 'm4a', 'ogg'],
-        help="Upload a 5-10 second audio file with stock market information"
-    )
     
-    if audio_file:
-        st.audio(audio_file, format=audio_file.type)
-        st.success(f"✅ File uploaded: {audio_file.name}")
+    if processing_mode == "Single File":
+        audio_file = st.file_uploader(
+            "Choose audio file",
+            type=['wav', 'mp3', 'flac', 'm4a', 'ogg'],
+            help="Upload a 5-10 second audio file with stock market information"
+        )
+        audio_files = [audio_file] if audio_file else []
+        
+        if audio_file:
+            st.audio(audio_file, format=audio_file.type)
+            st.success(f"✅ File uploaded: {audio_file.name}")
+    
+    else:  # Batch mode
+        audio_files = st.file_uploader(
+            "Choose audio files (multiple)",
+            type=['wav', 'mp3', 'flac', 'm4a', 'ogg'],
+            accept_multiple_files=True,
+            help="Upload multiple audio files to process them all at once"
+        )
+        
+        if audio_files:
+            st.success(f"✅ {len(audio_files)} files uploaded")
+            with st.expander("View uploaded files"):
+                for i, f in enumerate(audio_files, 1):
+                    st.text(f"  {i}. {f.name}")
 
 with col2:
     st.header("📝 Prompt (Required)")
@@ -147,8 +176,8 @@ st.markdown("---")
 process_button = st.button("🚀 Extract Stock Prices", type="primary", use_container_width=True)
 
 if process_button:
-    if not audio_file:
-        st.error("❌ Please upload an audio file first!")
+    if not audio_files:
+        st.error("❌ Please upload at least one audio file!")
         st.stop()
     
     # Check prompt is provided (required for LLM)
@@ -164,99 +193,119 @@ if process_button:
         st.error("❌ Please upload a prompt file!")
         st.stop()
     
-    # Show processing status
-    with st.spinner("🔄 Processing audio with LLM..."):
-        # Save audio to temp file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_audio:
-            tmp_audio.write(audio_file.read())
-            tmp_audio_path = tmp_audio.name
+    # Process files
+    import gc
+    import torch
+    
+    all_results = {}
+    
+    if processing_mode == "Single File":
+        # Single file processing
+        audio_file = audio_files[0]
         
-        try:
-            # Transcribe
-            st.info("🎤 Transcribing audio...")
-            trans_result = transcribe(tmp_audio_path)
+        with st.spinner("🔄 Processing audio with LLM..."):
+            # Save audio to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_audio:
+                tmp_audio.write(audio_file.read())
+                tmp_audio_path = tmp_audio.name
             
-            if isinstance(trans_result, dict):
-                transcript = trans_result['result']
-                trans_time = trans_result.get('time', 0)
-            else:
-                transcript = trans_result
-                trans_time = 0
-            
-            if not transcript:
-                st.error("❌ Failed to transcribe audio")
-                st.stop()
-            
-            # Extract using LLM (always)
-            if not st.session_state.llm_model_loaded:
-                st.info("🤖 Loading LLM model (first time only, ~2GB download)...")
-                st.warning("⏳ This may take 5-10 minutes on first run. Model will be cached for future use.")
-            else:
-                st.info("🤖 Using LLM for extraction...")
-            
-            if prompt_file:
-                extraction = extract_with_long_prompt(transcript, prompt_file=prompt_file)
-            else:
-                extraction = extract_with_long_prompt(transcript, prompt_text=prompt_text)
-            
-            # Mark model as loaded
-            if extraction is not None:
-                st.session_state.llm_model_loaded = True
-            
-            method_used = "LLM"
-            
-            # Display results
-            st.markdown("---")
-            st.header("📊 Extraction Results")
-            
-            # Results in columns
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("Extraction Method", method_used)
-            
-            with col2:
-                if trans_time:
-                    st.metric("Transcription Time", f"{trans_time:.2f}s")
-            
-            with col3:
-                if extraction:
-                    st.metric("Status", "✅ Success")
+            try:
+                # Transcribe
+                st.info("🎤 Transcribing audio...")
+                trans_result = transcribe(tmp_audio_path)
+                
+                if isinstance(trans_result, dict):
+                    transcript = trans_result['result']
+                    trans_time = trans_result.get('time', 0)
                 else:
-                    st.metric("Status", "❌ Failed")
-            
-            if extraction:
-                # Main results
-                st.markdown("### 📈 Extracted Information")
+                    transcript = trans_result
+                    trans_time = 0
                 
-                result_cols = st.columns(2)
+                if not transcript:
+                    st.error("❌ Failed to transcribe audio")
+                    st.stop()
                 
-                with result_cols[0]:
-                    st.markdown("**Index Name:**")
-                    st.info(extraction.get('index_name', 'N/A'))
+                # Extract using LLM
+                if not st.session_state.llm_model_loaded:
+                    st.info("🤖 Loading LLM model (first time only, ~2GB download)...")
+                    st.warning("⏳ This may take 5-10 minutes on first run. Model will be cached for future use.")
+                else:
+                    st.info("🤖 Using LLM for extraction...")
+                
+                if prompt_file:
+                    extraction = extract_with_long_prompt(transcript, prompt_file=prompt_file)
+                else:
+                    extraction = extract_with_long_prompt(transcript, prompt_text=prompt_text)
+                
+                # Mark model as loaded
+                if extraction is not None:
+                    st.session_state.llm_model_loaded = True
+                
+                # Display results
+                st.markdown("---")
+                st.header("📊 Extraction Results")
+                
+                # Results in columns
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Extraction Method", "LLM")
+                
+                with col2:
+                    if trans_time:
+                        st.metric("Transcription Time", f"{trans_time:.2f}s")
+                
+                with col3:
+                    if extraction:
+                        st.metric("Status", "✅ Success")
+                    else:
+                        st.metric("Status", "❌ Failed")
+                
+                if extraction:
+                    # Main results
+                    st.markdown("### 📈 Extracted Information")
                     
-                    st.markdown("**Price:**")
-                    st.info(extraction.get('price', 'N/A'))
+                    result_cols = st.columns(2)
                     
-                    st.markdown("**Change:**")
-                    st.info(extraction.get('change', 'N/A'))
-                
-                with result_cols[1]:
-                    st.markdown("**Change %:**")
-                    st.info(extraction.get('change_percent', 'N/A'))
+                    with result_cols[0]:
+                        st.markdown("**Index Name:**")
+                        st.info(extraction.get('index_name', 'N/A'))
+                        
+                        st.markdown("**Price:**")
+                        st.info(extraction.get('price', 'N/A'))
+                        
+                        st.markdown("**Change:**")
+                        st.info(extraction.get('change', 'N/A'))
                     
-                    st.markdown("**Session:**")
-                    st.info(extraction.get('session', 'N/A'))
+                    with result_cols[1]:
+                        st.markdown("**Change %:**")
+                        st.info(extraction.get('change_percent', 'N/A'))
+                        
+                        st.markdown("**Session:**")
+                        st.info(extraction.get('session', 'N/A'))
+                        
+                        st.markdown("**Standardized Quote:**")
+                        st.success(extraction.get('standardized_quote', 'N/A'))
                     
-                    st.markdown("**Standardized Quote:**")
-                    st.success(extraction.get('standardized_quote', 'N/A'))
-                
-                # Expandable sections
-                with st.expander("📝 View Transcript"):
-                    st.text(transcript)
-                
-                with st.expander("📋 View Full JSON"):
-                    st.json({
+                    # Expandable sections
+                    with st.expander("📝 View Transcript"):
+                        st.text(transcript)
+                    
+                    with st.expander("📋 View Full JSON"):
+                        st.json({
+                            'index_name': extraction.get('index_name'),
+                            'price': extraction.get('price'),
+                            'change': extraction.get('change'),
+                            'change_percent': extraction.get('change_percent'),
+                            'session': extraction.get('session'),
+                            'standardized_quote': extraction.get('standardized_quote'),
+                            'transcript': transcript,
+                            'method': 'LLM',
+                            'transcription_time_s': trans_time
+                        })
+                    
+                    # Download results
+                    results_json = json.dumps({
                         'index_name': extraction.get('index_name'),
                         'price': extraction.get('price'),
                         'change': extraction.get('change'),
@@ -264,46 +313,134 @@ if process_button:
                         'session': extraction.get('session'),
                         'standardized_quote': extraction.get('standardized_quote'),
                         'transcript': transcript,
-                        'method': method_used,
+                        'method': 'LLM',
                         'transcription_time_s': trans_time
-                    })
+                    }, indent=2)
+                    
+                    st.download_button(
+                        label="💾 Download Results (JSON)",
+                        data=results_json,
+                        file_name="extraction_results.json",
+                        mime="application/json"
+                    )
+                else:
+                    st.warning("⚠️ No extraction possible. Please check your prompt and try again.")
+                    st.markdown("**Transcript:**")
+                    st.text(transcript)
+                    st.info("💡 Tip: Make sure your prompt clearly instructs the LLM on what to extract and in what format.")
+            
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                if st.checkbox("Show error details"):
+                    st.exception(e)
+            
+            finally:
+                # Cleanup temp files
+                if os.path.exists(tmp_audio_path):
+                    os.unlink(tmp_audio_path)
+                if prompt_file and os.path.exists(prompt_file):
+                    os.unlink(prompt_file)
+    
+    else:
+        # Batch processing
+        st.markdown("---")
+        st.header("📊 Batch Processing Results")
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        results_container = st.container()
+        
+        for idx, audio_file in enumerate(audio_files, 1):
+            status_text.text(f"Processing {idx}/{len(audio_files)}: {audio_file.name}...")
+            progress = idx / len(audio_files)
+            progress_bar.progress(progress)
+            
+            try:
+                # Save audio to temp file
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_audio:
+                    tmp_audio.write(audio_file.read())
+                    tmp_audio_path = tmp_audio.name
                 
-                # Download results
-                results_json = json.dumps({
-                    'index_name': extraction.get('index_name'),
-                    'price': extraction.get('price'),
-                    'change': extraction.get('change'),
-                    'change_percent': extraction.get('change_percent'),
-                    'session': extraction.get('session'),
-                    'standardized_quote': extraction.get('standardized_quote'),
-                    'transcript': transcript,
-                    'method': method_used,
-                    'transcription_time_s': trans_time
-                }, indent=2)
+                # Transcribe
+                trans_result = transcribe(tmp_audio_path)
                 
-                st.download_button(
-                    label="💾 Download Results (JSON)",
-                    data=results_json,
-                    file_name="extraction_results.json",
-                    mime="application/json"
-                )
+                if isinstance(trans_result, dict):
+                    transcript = trans_result['result']
+                else:
+                    transcript = trans_result
+                
+                # Extract
+                if prompt_file:
+                    extraction = extract_with_long_prompt(transcript, prompt_file=prompt_file)
+                else:
+                    extraction = extract_with_long_prompt(transcript, prompt_text=prompt_text)
+                
+                # Mark model as loaded
+                if extraction is not None:
+                    st.session_state.llm_model_loaded = True
+                
+                all_results[audio_file.name] = {
+                    "status": "success",
+                    "data": extraction
+                }
+                
+                # Cleanup
+                if os.path.exists(tmp_audio_path):
+                    os.unlink(tmp_audio_path)
+                
+                # Clear GPU memory
+                torch.cuda.empty_cache()
+                gc.collect()
+                
+            except Exception as e:
+                all_results[audio_file.name] = {
+                    "status": "error",
+                    "error": str(e)
+                }
+        
+        status_text.text("✅ Processing complete!")
+        progress_bar.progress(1.0)
+        
+        # Display results
+        st.markdown("### 📈 Results Summary")
+        
+        success_count = sum(1 for r in all_results.values() if r["status"] == "success")
+        error_count = len(all_results) - success_count
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Files", len(all_results))
+        with col2:
+            st.metric("✅ Success", success_count)
+        with col3:
+            st.metric("❌ Failed", error_count)
+        
+        # Show individual results
+        st.markdown("### 📋 Individual Results")
+        
+        for filename, result in all_results.items():
+            if result["status"] == "success":
+                with st.expander(f"✅ {filename}"):
+                    data = result["data"]
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Index:** {data.get('index_name', 'N/A')}")
+                        st.write(f"**Price:** {data.get('price', 'N/A')}")
+                    with col2:
+                        st.write(f"**Change:** {data.get('change', 'N/A')}")
+                        st.write(f"**Change %:** {data.get('change_percent', 'N/A')}")
             else:
-                st.warning("⚠️ No extraction possible. Please check your prompt and try again.")
-                st.markdown("**Transcript:**")
-                st.text(transcript)
-                st.info("💡 Tip: Make sure your prompt clearly instructs the LLM on what to extract and in what format.")
+                with st.expander(f"❌ {filename}"):
+                    st.error(f"Error: {result['error']}")
         
-        except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
-            if st.checkbox("Show error details"):
-                st.exception(e)
-        
-        finally:
-            # Cleanup temp files
-            if os.path.exists(tmp_audio_path):
-                os.unlink(tmp_audio_path)
-            if prompt_file and os.path.exists(prompt_file):
-                os.unlink(prompt_file)
+        # Download batch results
+        batch_results_json = json.dumps(all_results, indent=2)
+        st.download_button(
+            label="💾 Download All Results (JSON)",
+            data=batch_results_json,
+            file_name="batch_results.json",
+            mime="application/json"
+        )
 
 # Footer
 st.markdown("---")

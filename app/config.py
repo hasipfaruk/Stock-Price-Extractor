@@ -9,9 +9,9 @@ PROJECT_ROOT = Path(__file__).parent.parent
 MODELS_DIR = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)  # Create models directory if it doesn't exist
 
-# Whisper model for transcription - Using Large-v3 for high accuracy on GPU
-# For < 3s latency requirement on GPU, Large-v3 is optimal
-MODEL_TRANSCRIBE = "openai/whisper-large-v3"  # High accuracy, optimized for GPU
+# Whisper model for transcription - Using Large-v2 for high accuracy on GPU
+# For < 3s latency requirement on GPU, Large-v2 is optimal
+MODEL_TRANSCRIBE = "openai/whisper-large-v2"  # High accuracy, optimized for GPU
 # Alternative options if speed is critical:
 # "distil-whisper/distil-large-v2" - Faster, slightly lower accuracy
 # "openai/whisper-medium" - Good balance

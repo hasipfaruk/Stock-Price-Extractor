@@ -52,9 +52,10 @@ def _load_models(model_name: str = None, model_path: str = None):
                 )
                 
                 # Load model with optimizations for GPU
+                # Use float32 to avoid GPU precision mismatches
                 load_kwargs = {
                     "cache_dir": cache_dir,
-                    "torch_dtype": torch.float16 if DEVICE == "cuda" else torch.float32,
+                    "torch_dtype": torch.float32,
                 }
                 
                 if DEVICE == "cuda":
@@ -78,17 +79,18 @@ def _load_models(model_name: str = None, model_path: str = None):
                     _model.to(DEVICE)
                     
             except Exception as e:
-                # Fallback to smaller model if Large-v3 fails
+                # Fallback to smaller model if Large-v2 fails
                 print(f"Warning: {use_model} not available, falling back to whisper-medium")
                 use_model = "openai/whisper-medium"
                 _processor = AutoProcessor.from_pretrained(
                     use_model,
                     cache_dir=cache_dir
                 )
+                # Use float32 for fallback model to avoid GPU precision errors
                 _model = AutoModelForSpeechSeq2Seq.from_pretrained(
                     use_model,
                     cache_dir=cache_dir,
-                    torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32,
+                    torch_dtype=torch.float32,
                 ).to(DEVICE)
         
         _model.eval()
@@ -163,6 +165,6 @@ def transcribe(audio_path: str, model_name: str = None, model_path: str = None):
     
     elapsed = time.time() - start_time
     if elapsed > TARGET_LATENCY_SECONDS * 0.5:  # Warn if transcription takes >50% of target
-        print(f"⚠️ Transcription took {elapsed:.2f}s (target: <{TARGET_LATENCY_SECONDS * 0.5:.2f}s)")
+        print(f" Transcription took {elapsed:.2f}s (target: <{TARGET_LATENCY_SECONDS * 0.5:.2f}s)")
     
     return text
