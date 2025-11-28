@@ -8,6 +8,7 @@ Uses Llama 2 for accurate price extraction
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 # Add project root to path
@@ -97,14 +98,17 @@ Examples:
         if args.verbose:
             print("Transcribing audio...", file=sys.stderr)
         
+        total_start = time.time()
+        trans_start = time.time()
         trans_result = transcribe(str(audio_path))
+        trans_duration = time.time() - trans_start
         
         if isinstance(trans_result, dict):
             transcript = trans_result['result']
-            trans_time = trans_result.get('time', None)
+            trans_time = trans_result.get('time', trans_duration)
         else:
             transcript = trans_result
-            trans_time = None
+            trans_time = trans_duration
         
         if not transcript:
             print("Error: Failed to transcribe audio", file=sys.stderr)
@@ -112,20 +116,27 @@ Examples:
         
         # Extract price using LLM (only method available)
         if args.transcript_only:
+            total_duration = time.time() - total_start
             result = {
                 "transcript": transcript,
-                "timing": {"transcription_s": trans_time} if trans_time else {}
+                "timing": {
+                    "transcription_s": round(trans_time, 3),
+                    "total_s": round(total_duration, 3)
+                }
             }
         else:
             # 100% LLM-powered extraction (NO REGEX FALLBACK)
             if args.verbose:
                 print("Using Llama 2 LLM for extraction (100% LLM-powered)...", file=sys.stderr)
             
+            extract_start = time.time()
             llm_result = extract_with_long_prompt(
                 transcript,
                 prompt_file=args.prompt_file if not args.prompt_text else None,
                 prompt_text=args.prompt_text
             )
+            extract_duration = time.time() - extract_start
+            total_duration = time.time() - total_start
             
             if not llm_result:
                 print("Error: LLM extraction failed - no valid JSON returned from LLM", file=sys.stderr)
@@ -141,7 +152,11 @@ Examples:
                 "session": llm_result.get('session'),
                 "standardized_quote": llm_result.get('standardized_quote'),
                 "transcript": transcript,
-                "timing": {"transcription_s": trans_time} if trans_time else {},
+                "timing": {
+                    "transcription_s": round(trans_time, 3),
+                    "extraction_s": round(extract_duration, 3),
+                    "total_s": round(total_duration, 3)
+                },
                 "extraction_method": "LLM (Llama 2)",
                 "note": "100% LLM-powered extraction. No regex fallback.",
                 "model": "meta-llama/Llama-2-7b-chat-hf"
@@ -210,16 +225,30 @@ def print_result(result: dict, verbose: bool = False):
     if result.get('standardized_quote'):
         print(f"\n[QUOTE] {result['standardized_quote']}")
     
+    # Display timing information
+    timing = result.get('timing', {})
+    if timing:
+        print(f"\n[TIMING]")
+        if timing.get('transcription_s'):
+            print(f"  🎤 Transcription: {timing['transcription_s']:.3f}s")
+        if timing.get('extraction_s'):
+            print(f"  🤖 Extraction: {timing['extraction_s']:.3f}s")
+        if timing.get('total_s'):
+            print(f"  ⏱️  Total: {timing['total_s']:.3f}s")
+    
     if verbose:
         print(f"\n[TRANSCRIPT]")
         print(f"   {result.get('transcript', 'N/A')}")
-        
-        if result.get('timing', {}).get('transcription_s'):
-            print(f"\n[TIME] Total Processing Time: {result['timing']['transcription_s']:.3f}s")
     
-    print(f"\n[EXTRACTION METHOD] {result.get('extraction_method', 'LLM')}")
-    print(f"[MODEL] {result.get('model', 'meta-llama/Llama-2-7b-chat-hf')}")
-    print(f"[NOTE] {result.get('note', 'N/A')}")
+    if result.get('extraction_method'):
+        print(f"\n[EXTRACTION METHOD] {result.get('extraction_method', 'LLM')}")
+    
+    if result.get('model'):
+        print(f"[MODEL] {result.get('model', 'meta-llama/Llama-2-7b-chat-hf')}")
+    
+    if result.get('note'):
+        print(f"[NOTE] {result.get('note', 'N/A')}")
+    
     print("="*60 + "\n")
 
 

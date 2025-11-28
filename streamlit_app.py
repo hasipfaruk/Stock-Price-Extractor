@@ -196,12 +196,14 @@ if process_button:
     # Process files
     import gc
     import torch
+    import time
     
     all_results = {}
     
     if processing_mode == "Single File":
         # Single file processing
         audio_file = audio_files[0]
+        file_start_time = time.time()
         
         with st.spinner("🔄 Processing audio with LLM..."):
             # Save audio to temp file
@@ -212,14 +214,16 @@ if process_button:
             try:
                 # Transcribe
                 st.info("🎤 Transcribing audio...")
+                trans_start = time.time()
                 trans_result = transcribe(tmp_audio_path)
+                trans_total = time.time() - trans_start
                 
                 if isinstance(trans_result, dict):
                     transcript = trans_result['result']
-                    trans_time = trans_result.get('time', 0)
+                    trans_time = trans_result.get('time', trans_total)
                 else:
                     transcript = trans_result
-                    trans_time = 0
+                    trans_time = trans_total
                 
                 if not transcript:
                     st.error("❌ Failed to transcribe audio")
@@ -232,34 +236,40 @@ if process_button:
                 else:
                     st.info("🤖 Using LLM for extraction...")
                 
+                extract_start = time.time()
                 if prompt_file:
                     extraction = extract_with_long_prompt(transcript, prompt_file=prompt_file)
                 else:
                     extraction = extract_with_long_prompt(transcript, prompt_text=prompt_text)
+                extract_time = time.time() - extract_start
                 
                 # Mark model as loaded
                 if extraction is not None:
                     st.session_state.llm_model_loaded = True
                 
+                total_time = time.time() - file_start_time
+                
                 # Display results
                 st.markdown("---")
                 st.header("📊 Extraction Results")
                 
-                # Results in columns
-                col1, col2, col3 = st.columns(3)
+                # Results in columns with timing
+                col1, col2, col3, col4, col5 = st.columns(5)
                 
                 with col1:
-                    st.metric("Extraction Method", "LLM")
+                    st.metric("Status", "✅ Success" if extraction else "❌ Failed")
                 
                 with col2:
-                    if trans_time:
-                        st.metric("Transcription Time", f"{trans_time:.2f}s")
+                    st.metric("📝 Transcription", f"{trans_time:.2f}s")
                 
                 with col3:
-                    if extraction:
-                        st.metric("Status", "✅ Success")
-                    else:
-                        st.metric("Status", "❌ Failed")
+                    st.metric("🤖 Extraction", f"{extract_time:.2f}s")
+                
+                with col4:
+                    st.metric("⏱️ Total", f"{total_time:.2f}s")
+                
+                with col5:
+                    st.metric("Method", "LLM")
                 
                 if extraction:
                     # Main results
@@ -301,7 +311,11 @@ if process_button:
                             'standardized_quote': extraction.get('standardized_quote'),
                             'transcript': transcript,
                             'method': 'LLM',
-                            'transcription_time_s': trans_time
+                            'timing': {
+                                'transcription_s': round(trans_time, 3),
+                                'extraction_s': round(extract_time, 3),
+                                'total_s': round(total_time, 3)
+                            }
                         })
                     
                     # Download results
@@ -314,7 +328,11 @@ if process_button:
                         'standardized_quote': extraction.get('standardized_quote'),
                         'transcript': transcript,
                         'method': 'LLM',
-                        'transcription_time_s': trans_time
+                        'timing': {
+                            'transcription_s': round(trans_time, 3),
+                            'extraction_s': round(extract_time, 3),
+                            'total_s': round(total_time, 3)
+                        }
                     }, indent=2)
                     
                     st.download_button(
@@ -349,8 +367,10 @@ if process_button:
         progress_bar = st.progress(0)
         status_text = st.empty()
         results_container = st.container()
+        batch_start_time = time.time()
         
         for idx, audio_file in enumerate(audio_files, 1):
+            file_start = time.time()
             status_text.text(f"Processing {idx}/{len(audio_files)}: {audio_file.name}...")
             progress = idx / len(audio_files)
             progress_bar.progress(progress)
@@ -362,26 +382,38 @@ if process_button:
                     tmp_audio_path = tmp_audio.name
                 
                 # Transcribe
+                trans_start = time.time()
                 trans_result = transcribe(tmp_audio_path)
+                trans_time = time.time() - trans_start
                 
                 if isinstance(trans_result, dict):
                     transcript = trans_result['result']
+                    trans_time = trans_result.get('time', trans_time)
                 else:
                     transcript = trans_result
                 
                 # Extract
+                extract_start = time.time()
                 if prompt_file:
                     extraction = extract_with_long_prompt(transcript, prompt_file=prompt_file)
                 else:
                     extraction = extract_with_long_prompt(transcript, prompt_text=prompt_text)
+                extract_time = time.time() - extract_start
                 
                 # Mark model as loaded
                 if extraction is not None:
                     st.session_state.llm_model_loaded = True
                 
+                file_total = time.time() - file_start
+                
                 all_results[audio_file.name] = {
                     "status": "success",
-                    "data": extraction
+                    "data": extraction,
+                    "timing": {
+                        "transcription_s": round(trans_time, 3),
+                        "extraction_s": round(extract_time, 3),
+                        "total_s": round(file_total, 3)
+                    }
                 }
                 
                 # Cleanup
@@ -393,11 +425,16 @@ if process_button:
                 gc.collect()
                 
             except Exception as e:
+                file_total = time.time() - file_start
                 all_results[audio_file.name] = {
                     "status": "error",
-                    "error": str(e)
+                    "error": str(e),
+                    "timing": {
+                        "total_s": round(file_total, 3)
+                    }
                 }
         
+        batch_total_time = time.time() - batch_start_time
         status_text.text("✅ Processing complete!")
         progress_bar.progress(1.0)
         
@@ -406,21 +443,27 @@ if process_button:
         
         success_count = sum(1 for r in all_results.values() if r["status"] == "success")
         error_count = len(all_results) - success_count
+        avg_time = sum(r.get("timing", {}).get("total_s", 0) for r in all_results.values() if r["status"] == "success") / max(success_count, 1)
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Total Files", len(all_results))
         with col2:
             st.metric("✅ Success", success_count)
         with col3:
             st.metric("❌ Failed", error_count)
+        with col4:
+            st.metric("⏱️ Batch Total", f"{batch_total_time:.2f}s")
+        
+        st.info(f"📊 Average time per file: **{avg_time:.2f}s**")
         
         # Show individual results
         st.markdown("### 📋 Individual Results")
         
         for filename, result in all_results.items():
             if result["status"] == "success":
-                with st.expander(f"✅ {filename}"):
+                timing = result.get("timing", {})
+                with st.expander(f"✅ {filename} (⏱️ {timing.get('total_s', 0):.2f}s)"):
                     data = result["data"]
                     col1, col2 = st.columns(2)
                     with col1:
@@ -429,14 +472,34 @@ if process_button:
                     with col2:
                         st.write(f"**Change:** {data.get('change', 'N/A')}")
                         st.write(f"**Change %:** {data.get('change_percent', 'N/A')}")
+                    
+                    st.markdown("**Timing Details:**")
+                    timing_col1, timing_col2, timing_col3 = st.columns(3)
+                    with timing_col1:
+                        st.write(f"🎤 Transcription: **{timing.get('transcription_s', 0):.3f}s**")
+                    with timing_col2:
+                        st.write(f"🤖 Extraction: **{timing.get('extraction_s', 0):.3f}s**")
+                    with timing_col3:
+                        st.write(f"⏱️ Total: **{timing.get('total_s', 0):.3f}s**")
             else:
-                with st.expander(f"❌ {filename}"):
+                timing = result.get("timing", {})
+                with st.expander(f"❌ {filename} (⏱️ {timing.get('total_s', 0):.2f}s)"):
                     st.error(f"Error: {result['error']}")
         
-        # Download batch results
-        batch_results_json = json.dumps(all_results, indent=2)
+        # Download batch results with timing summary
+        batch_summary = {
+            "summary": {
+                "total_files": len(all_results),
+                "successful": success_count,
+                "failed": error_count,
+                "batch_total_time_s": round(batch_total_time, 3),
+                "average_time_per_file_s": round(avg_time, 3)
+            },
+            "results": all_results
+        }
+        batch_results_json = json.dumps(batch_summary, indent=2)
         st.download_button(
-            label="💾 Download All Results (JSON)",
+            label="💾 Download All Results (JSON with Timing)",
             data=batch_results_json,
             file_name="batch_results.json",
             mime="application/json"
