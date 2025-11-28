@@ -4,7 +4,7 @@ import librosa
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 from .utils import timeit
 from .post_process import fix_transcription_errors
-from ..config import MODEL_TRANSCRIBE, DEVICE, MODEL_CACHE_DIR, TARGET_LATENCY_SECONDS
+from ..config import MODEL_TRANSCRIBE, DEVICE, MODEL_CACHE_DIR, TARGET_LATENCY_SECONDS, TARGET_TRANSCRIBE_SECONDS
 
 # Lazy loading - models will be loaded on first use
 _processor = None
@@ -125,10 +125,10 @@ def transcribe(audio_path: str, model_name: str = None, model_path: str = None):
     for k, v in inputs.items():
         inputs[k] = v.to(DEVICE)
     
-    # Optimized generation settings for speed (< 3s requirement)
-    # Whisper Large-v3 on GPU can achieve <1s transcription for short audio
+    # Optimized generation settings for speed (<2s target for <6s total)
+    # Distil-Whisper on GPU can achieve <1s transcription for short audio
     generation_kwargs = {
-        "max_length": 448,  # Reduced from 512 for speed (sufficient for short financial audio)
+        "max_length": 256,  # Further reduced for speed (sufficient for short financial audio)
         "language": "en",  # Specify English for better accuracy and speed
         "task": "transcribe",
         "return_timestamps": False,  # Disable timestamps for speed
@@ -164,7 +164,7 @@ def transcribe(audio_path: str, model_name: str = None, model_path: str = None):
     text = fix_transcription_errors(text)
     
     elapsed = time.time() - start_time
-    if elapsed > TARGET_LATENCY_SECONDS * 0.5:  # Warn if transcription takes >50% of target
-        print(f" Transcription took {elapsed:.2f}s (target: <{TARGET_LATENCY_SECONDS * 0.5:.2f}s)")
+    if elapsed > TARGET_TRANSCRIBE_SECONDS:
+        print(f"⚠️ Transcription took {elapsed:.2f}s (target: <{TARGET_TRANSCRIBE_SECONDS:.2f}s)")
     
     return text

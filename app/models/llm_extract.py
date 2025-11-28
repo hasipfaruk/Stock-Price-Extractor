@@ -1,5 +1,5 @@
 """
-LLM-based extraction using Llama 2 with vLLM for optimized GPU inference
+LLM-based extraction using Mistral with vLLM for optimized GPU inference
 Optimized for <3s end-to-end latency
 """
 
@@ -10,7 +10,7 @@ import warnings
 import os
 import logging
 import time
-from ..config import DEVICE, MODEL_CACHE_DIR, USE_VLLM, LLM_MODEL_NAME, VLLM_MAX_MODEL_LEN
+from ..config import DEVICE, MODEL_CACHE_DIR, USE_VLLM, LLM_MODEL_NAME, VLLM_MAX_MODEL_LEN, VLLM_MAX_TOKENS, TARGET_LLM_SECONDS
 from .normalize import validate_and_normalize_extraction
 
 # Suppress transformers warnings at module level
@@ -39,7 +39,7 @@ _current_model_name = None
 
 
 def _load_vllm_model(model_name: str = None):
-    """Load Llama 2 model using vLLM for GPU-optimized inference"""
+    """Load Mistral model using vLLM for GPU-optimized inference"""
     global _vllm_llm, _current_model_name
     
     model_id = model_name or LLM_MODEL_NAME
@@ -48,19 +48,28 @@ def _load_vllm_model(model_name: str = None):
         try:
             from vllm import LLM
             
-            print(f"Loading Llama 2 model with vLLM: {model_id}")
+            print(f"Loading Mistral model with vLLM: {model_id}")
             print("This may take a few minutes on first run...")
             
-            # Configure vLLM for optimal performance
-            _vllm_llm = LLM(
-                model=model_id,
-                trust_remote_code=True,
-                max_model_len=VLLM_MAX_MODEL_LEN,
-                tensor_parallel_size=1,  # Adjust based on GPU count
-                gpu_memory_utilization=0.9,  # Use 90% of GPU memory
-                dtype="float16",  # Use FP16 for speed
-                enable_prefix_caching=True,  # Cache prompts for faster inference
-            )
+            # Configure vLLM for optimal speed (<6s target)
+            vllm_kwargs = {
+                "model": model_id,
+                "trust_remote_code": True,
+                "max_model_len": VLLM_MAX_MODEL_LEN,  # Reduced for speed
+                "tensor_parallel_size": 1,  # Adjust based on GPU count
+                "gpu_memory_utilization": 0.85,  # Slightly reduced for stability
+                "dtype": "float16",  # Use FP16 for speed
+                "enable_prefix_caching": True,  # Cache prompts for faster inference
+            }
+            
+            # Add optional speed optimizations (may not be available in all vLLM versions)
+            try:
+                vllm_kwargs["enable_chunked_prefill"] = True  # Enable chunked prefill for speed
+                vllm_kwargs["max_num_seqs"] = 256  # Increase batch capacity
+            except:
+                pass  # Skip if not supported
+            
+            _vllm_llm = LLM(**vllm_kwargs)
             
             _current_model_name = model_id
             print(" vLLM model loaded successfully!")
@@ -76,7 +85,7 @@ def _load_vllm_model(model_name: str = None):
 
 
 def _load_transformers_model(model_name: str = None):
-    """Fallback: Load Llama 2 model using transformers (for CPU or when vLLM unavailable)"""
+    """Fallback: Load Mistral model using transformers (for CPU or when vLLM unavailable)"""
     global _transformers_model, _transformers_tokenizer, _current_model_name
     
     model_id = model_name or LLM_MODEL_NAME
@@ -86,7 +95,7 @@ def _load_transformers_model(model_name: str = None):
             from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
             
-            print(f"Loading Llama 2 model with transformers: {model_id}")
+            print(f"Loading Mistral model with transformers: {model_id}")
             print("This may take a few minutes on first run...")
             
             # Load tokenizer
@@ -131,15 +140,13 @@ def _load_transformers_model(model_name: str = None):
     return _transformers_model, _transformers_tokenizer
 
 
-def _format_llama2_prompt(instruction: str, transcript: str) -> str:
+def _format_mistral_prompt(instruction: str, transcript: str) -> str:
     """
-    Format prompt for Llama 2 chat model
-    Llama 2 uses a specific chat format
+    Format prompt for Mistral Instruct model
+    Mistral uses a specific chat format
     """
-    # Llama 2 chat template
-    prompt = f"""<s>[INST] <<SYS>>
-{instruction}
-<</SYS>>
+    # Mistral Instruct chat template
+    prompt = f"""<s>[INST] {instruction}
 
 Transcript:
 {transcript}
@@ -162,7 +169,7 @@ Return only valid JSON, no additional text. [/INST]"""
 
 def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Optional[Dict]:
     """
-    Extract stock price information using Llama 2 with vLLM (GPU) or transformers (CPU)
+    Extract stock price information using Mistral with vLLM (GPU) or transformers (CPU)
     Optimized for <3s latency
     
     Args:
@@ -180,16 +187,17 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
         llm = _load_vllm_model(model_name)
         if llm is not None:
             try:
-                # Format prompt for Llama 2
-                full_prompt = _format_llama2_prompt(prompt, transcript)
+                # Format prompt for Mistral
+                full_prompt = _format_mistral_prompt(prompt, transcript)
                 
-                # Generate with vLLM (optimized for speed)
+                # Generate with vLLM (optimized for speed - <3s target)
                 outputs = llm.generate(
                     [full_prompt],
                     sampling_params={
-                        "temperature": 0.1,  # Low temperature for deterministic output
-                        "max_tokens": 200,  # Limit output length for speed
+                        "temperature": 0.0,  # Zero temperature for fastest, deterministic output
+                        "max_tokens": VLLM_MAX_TOKENS,  # Reduced for speed
                         "stop": ["</s>", "[INST]", "\n\n\n"],  # Stop sequences
+                        "skip_special_tokens": True,  # Skip special tokens for speed
                     },
                     use_tqdm=False,  # Disable progress bar for speed
                 )
@@ -204,7 +212,10 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
                     # Normalize and validate
                     normalized = validate_and_normalize_extraction(extracted_data)
                     elapsed = time.time() - start_time
-                    print(f" LLM extraction completed in {elapsed:.2f}s")
+                    if elapsed > TARGET_LLM_SECONDS:
+                        print(f"⚠️ LLM extraction took {elapsed:.2f}s (target: <{TARGET_LLM_SECONDS:.2f}s)")
+                    else:
+                        print(f"⚡ LLM extraction completed in {elapsed:.2f}s")
                     return normalized
                     
             except Exception as e:
@@ -217,8 +228,8 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
         return None
     
     try:
-        # Format prompt for Llama 2
-        full_prompt = _format_llama2_prompt(prompt, transcript)
+        # Format prompt for Mistral
+        full_prompt = _format_mistral_prompt(prompt, transcript)
         
         # Tokenize
         inputs = tokenizer(
@@ -232,17 +243,18 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
         # Move to device
         inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
         
-        # Generate (optimized for speed)
+        # Generate (optimized for speed - <3s target)
         import torch
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=200,
-                temperature=0.1,
+                max_new_tokens=VLLM_MAX_TOKENS,  # Reduced for speed
+                temperature=0.0,  # Zero temperature for fastest inference
                 do_sample=False,  # Greedy decoding for speed
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
                 use_cache=True,  # Enable KV cache for speed
+                num_beams=1,  # Greedy decoding (fastest)
             )
         
         # Decode
@@ -255,7 +267,10 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
             # Normalize and validate
             normalized = validate_and_normalize_extraction(extracted_data)
             elapsed = time.time() - start_time
-            print(f" LLM extraction completed in {elapsed:.2f}s")
+            if elapsed > TARGET_LLM_SECONDS:
+                print(f"⚠️ LLM extraction took {elapsed:.2f}s (target: <{TARGET_LLM_SECONDS:.2f}s)")
+            else:
+                print(f"⚡ LLM extraction completed in {elapsed:.2f}s")
             return normalized
             
     except Exception as e:
@@ -334,5 +349,5 @@ def extract_with_long_prompt(transcript: str, prompt_file: str = None, prompt_te
     else:
         return None
     
-    # Use Llama 2 for extraction
+    # Use Mistral for extraction
     return extract_with_llm(transcript, prompt)
