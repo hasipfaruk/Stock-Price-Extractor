@@ -29,8 +29,8 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # vLLM configuration for GPU-optimized inference (optimized for speed)
 USE_VLLM = (DEVICE == "cuda")  # Use vLLM only on GPU
 VLLM_TENSOR_PARALLEL_SIZE = 1  # Adjust based on GPU count
-VLLM_MAX_MODEL_LEN = 2048  # Reduced for faster processing (sufficient for short transcripts)
-VLLM_MAX_TOKENS = 150  # Limit output tokens for faster generation
+VLLM_MAX_MODEL_LEN = 2048  # Context length (sufficient for short transcripts)
+VLLM_MAX_TOKENS = 100  # Limit output tokens for faster generation and <5s total latency
 
 # Mistral model configuration
 # Using smallest Mistral model (3B) for fastest processing and lowest memory usage
@@ -41,14 +41,15 @@ LLM_MODEL_NAME = "mistralai/Mistral-3B"  # Smallest: 3B model (fastest, ~6GB)
 # "mistralai/Mixtral-8x7B-Instruct-v0.1" - Mixtral (requires more GPU memory, ~47GB)
 
 # Processing settings
-MAX_AUDIO_LENGTH = 10  # seconds
+# Keep clips short to guarantee latency bounds
+MAX_AUDIO_LENGTH = 5  # seconds (hard cap used in transcribe())
 SAMPLE_RATE = 16000
 
 # CPU-specific optimizations
 USE_CPU_OPTIMIZATIONS = (DEVICE == "cpu")
 
 # Performance targets (optimized for 3B model - should be even faster!)
-TARGET_LATENCY_SECONDS = 6.0  # End-to-end latency target (<6s)
+TARGET_LATENCY_SECONDS = 5.0  # End-to-end latency target (<5s)
 TARGET_TRANSCRIBE_SECONDS = 2.0  # Transcription target (<2s)
 TARGET_LLM_SECONDS = 2.0  # LLM extraction target (<2s with 3B model - faster!)
 

@@ -4,7 +4,15 @@ import librosa
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 from .utils import timeit
 from .post_process import fix_transcription_errors
-from ..config import MODEL_TRANSCRIBE, DEVICE, MODEL_CACHE_DIR, TARGET_LATENCY_SECONDS, TARGET_TRANSCRIBE_SECONDS
+from ..config import (
+    MODEL_TRANSCRIBE,
+    DEVICE,
+    MODEL_CACHE_DIR,
+    MAX_AUDIO_LENGTH,
+    SAMPLE_RATE,
+    TARGET_LATENCY_SECONDS,
+    TARGET_TRANSCRIBE_SECONDS,
+)
 
 # Lazy loading - models will be loaded on first use
 _processor = None
@@ -117,11 +125,14 @@ def transcribe(audio_path: str, model_name: str = None, model_path: str = None):
     
     processor, model = _load_models(model_name=model_name, model_path=model_path)
     
-    # Load audio, resample if needed (optimized)
-    audio, sr = librosa.load(audio_path, sr=16000, mono=True)
+    # Load audio, resample if needed (optimized) and hard-cap duration
+    audio, sr = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
+    max_samples = int(MAX_AUDIO_LENGTH * SAMPLE_RATE)
+    if audio.shape[0] > max_samples:
+        audio = audio[:max_samples]
     
     # Process audio with optimized settings
-    inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
+    inputs = processor(audio, sampling_rate=SAMPLE_RATE, return_tensors="pt")
     for k, v in inputs.items():
         inputs[k] = v.to(DEVICE)
     
