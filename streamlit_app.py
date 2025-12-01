@@ -409,6 +409,7 @@ if process_button:
                 all_results[audio_file.name] = {
                     "status": "success",
                     "data": extraction,
+                    "transcript": transcript,
                     "timing": {
                         "transcription_s": round(trans_time, 3),
                         "extraction_s": round(extract_time, 3),

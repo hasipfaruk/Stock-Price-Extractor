@@ -9,15 +9,17 @@ Extract the following information from the transcript:
 4. Change percentage (if mentioned) - use the actual percentage or null if not mentioned
 5. Session context (e.g., CLOSING, PREMARKET, SESSION HIGH, SESSION LOW) - use actual session or null
 
-Return the result as JSON in this format (replace ALL values with actual values from transcript):
+Return the result as JSON in this format. Extract the ACTUAL values from the transcript - do NOT copy these example values:
 {
-  "index_name": "ACTUAL_INDEX_FROM_TRANSCRIPT",
-  "price": "ACTUAL_PRICE_FROM_TRANSCRIPT",
-  "change": "ACTUAL_CHANGE_OR_NULL",
-  "change_percent": "ACTUAL_PERCENTAGE_OR_NULL",
-  "session": "ACTUAL_SESSION_OR_NULL",
-  "standardized_quote": "INDEX @ PRICE CHANGE (PERCENTAGE)"
+  "index_name": "S&P 500",
+  "price": "4500",
+  "change": "+12",
+  "change_percent": "+0.27%",
+  "session": "PREMARKET",
+  "standardized_quote": "S&P 500 @ 4500 +12 (+0.27%)"
 }
+
+IMPORTANT: The above is just an EXAMPLE format. You MUST extract the ACTUAL values from the transcript provided. If a value is not mentioned in the transcript, use null.
 
 Rules:
 - Extract ONLY from the transcript - never copy example values

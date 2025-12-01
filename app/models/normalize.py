@@ -45,6 +45,32 @@ def normalize_index_name(value: Any) -> Optional[str]:
     return value_str
 
 
+def _is_placeholder_value(value: Any) -> bool:
+    """Check if a value is a placeholder that should be rejected"""
+    if value is None:
+        return False
+    
+    value_str = str(value).strip().upper()
+    
+    # List of placeholder patterns to detect
+    placeholder_patterns = [
+        'ACTUAL_INDEX_FROM_TRANSCRIPT',
+        'ACTUAL_PRICE_FROM_TRANSCRIPT',
+        'ACTUAL_CHANGE_OR_NULL',
+        'ACTUAL_PERCENTAGE_OR_NULL',
+        'ACTUAL_SESSION_OR_NULL',
+        'EXTRACT THE ACTUAL',
+        'EXTRACT FROM TRANSCRIPT',
+        'INDEX @ PRICE CHANGE',
+    ]
+    
+    for pattern in placeholder_patterns:
+        if pattern in value_str:
+            return True
+    
+    return False
+
+
 def validate_and_normalize_extraction(extracted: Dict) -> Optional[Dict]:
     """
     Validate and normalize extracted financial data
@@ -58,6 +84,14 @@ def validate_and_normalize_extraction(extracted: Dict) -> Optional[Dict]:
     """
     if not extracted or not isinstance(extracted, dict):
         return None
+    
+    # Check for placeholder values - reject if found
+    for key, value in extracted.items():
+        if _is_placeholder_value(value):
+            print(f"⚠️ Warning: Detected placeholder value in {key}: {value}")
+            print("   This suggests the LLM copied example text instead of extracting real values.")
+            # Set to None to force re-extraction or indicate error
+            extracted[key] = None
     
     # Normalize all fields
     normalized = {

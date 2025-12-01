@@ -148,23 +148,29 @@ def _format_llama2_prompt(instruction: str, transcript: str, tokenizer=None) -> 
     Uses tokenizer's chat template if available, otherwise manual format
     """
     # Build user message - make it VERY clear to use transcript values only
-    user_message = f"""Transcript to extract from:
+    user_message = f"""You are a financial data extractor. Read the transcript below and extract the actual values mentioned.
+
+TRANSCRIPT:
 {transcript}
 
-IMPORTANT: Extract information ONLY from the transcript above. Do NOT copy any example values - use the actual values mentioned in the transcript.
+TASK: Extract the following fields from the transcript above. Read the transcript carefully and find the actual values mentioned.
 
-Return JSON with this structure (replace ALL placeholder values with actual values from transcript):
-{{
-    "index_name": "ACTUAL_INDEX_FROM_TRANSCRIPT",
-    "price": "ACTUAL_PRICE_FROM_TRANSCRIPT",
-    "change": "ACTUAL_CHANGE_OR_NULL",
-    "change_percent": "ACTUAL_PERCENTAGE_OR_NULL",
-    "session": "ACTUAL_SESSION_OR_NULL",
-    "session_high": null,
-    "session_low": null
-}}
+Required fields:
+1. index_name: Find the stock index name mentioned (e.g., S&P 500, NASDAQ, DOW, DAX, VIX, etc.)
+2. price: Find the price number mentioned
+3. change: Find the change value in points (with + or - sign if mentioned, otherwise null)
+4. change_percent: Find the percentage change (with + or - sign if mentioned, otherwise null)
+5. session: Find the trading session mentioned (PREMARKET, CLOSING, SESSION HIGH, etc., or null)
+6. standardized_quote: Create a formatted string like "INDEX_NAME @ PRICE CHANGE (PERCENTAGE)"
 
-Return ONLY valid JSON, no explanation."""
+CRITICAL: 
+- Extract ONLY the values that are actually mentioned in the transcript above
+- Do NOT make up values
+- Do NOT copy example values
+- If something is not mentioned, use null
+- Read the transcript word by word to find the actual values
+
+Return your response as a JSON object with these exact field names. Extract the real values from the transcript:"""
 
     # Try to use tokenizer's chat template (proper Llama 2 format)
     if tokenizer is not None and hasattr(tokenizer, 'apply_chat_template'):
