@@ -197,18 +197,20 @@ def validate_and_normalize_extraction(extracted: Dict, transcript: str = None) -
         print("   The LLM copied instruction text instead of extracting from transcript.")
         return None
     
-    # Build normalized output in client-required format
+    # Build normalized output matching working code format
+    # Always use the provided transcript (most accurate)
     normalized = {
         'full_transcription': transcript or extracted.get('full_transcription') or '',
-        'standardized_quote': str(extracted.get('standardized_quote', '')).strip() or '',
-        'index_name': normalize_index_name(extracted.get('index_name')) or '',
+        'standardized_quote': extracted.get('standardized_quote'),  # Can be None
+        'index_name': normalize_index_name(extracted.get('index_name')),  # Can be None
     }
     
-    # Handle quote_analysis object
+    # Handle quote_analysis object - preserve structure from extraction
     quote_analysis = extracted.get('quote_analysis', {})
     if not isinstance(quote_analysis, dict):
         quote_analysis = {}
     
+    # Ensure all required fields exist (matching working code)
     normalized['quote_analysis'] = {
         'current_price': _normalize_number(quote_analysis.get('current_price')),
         'change_points': _normalize_number(quote_analysis.get('change_points')),
@@ -219,7 +221,8 @@ def validate_and_normalize_extraction(extracted: Dict, transcript: str = None) -
         'session_context': _normalize_session_context(quote_analysis.get('session_context')),
     }
     
-    # Remove None values from quote_analysis for cleaner output (but keep structure)
-    # Note: Client may want null values, so we keep them as None (which becomes null in JSON)
+    # Ensure full_transcription is set (matching working code)
+    if not normalized['full_transcription'] and transcript:
+        normalized['full_transcription'] = transcript
     
     return normalized

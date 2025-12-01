@@ -1,49 +1,15 @@
-Extract stock index price information from the transcript. Return ONLY valid JSON.
+You are a financial data extraction robot.
+Return ONLY valid JSON. No extra text.
 
-OUTPUT FORMAT:
+Required format:
 {
-  "full_transcription": "exact transcript text",
-  "standardized_quote": "formatted quote",
-  "index_name": "index name",
-  "quote_analysis": {
-    "current_price": number or null,
-    "change_points": number or null,
-    "change_percent": number or null,
-    "intraday_high": number or null,
-    "intraday_low": number or null,
-    "market_direction": "up" or "down" or "flat" or null,
-    "session_context": "opening" or "midday" or "closing" or "premarket" or "afterhours" or null
-  }
-}
-
-RULES:
-1. Index names: "S&P 500", "S&P", "SPX" → "S&P 500"; "Dow", "DJIA" → "DOW"; "NASDAQ" → "NASDAQ"; "FTSE" → "FTSE 100"; "DAX" → "DAX"; "Nikkei" → "NIKKEI 225"
-
-2. Standardized quote format:
-   - Price: "S&P at 4200" → "S&P 500 @ 4200"
-   - Change: "up 20 points" → "+20 pts"; "down 15" → "-15 pts"
-   - Percent: "up 0.5%" → "+0.5%"; "down 1%" → "-1%"
-   - Combined: "S&P 500 @ 4200 +20 pts (+0.5%)"
-   - Session: "premarket" → "PREMARKET"; "closing" → "CLOSING"
-
-3. Numbers: Extract as numbers (not strings) for quote_analysis fields
-
-4. Market direction: "up/higher/gaining" → "up"; "down/lower/falling" → "down"; "flat/unchanged" → "flat"
-
-5. Session: "opening/open" → "opening"; "midday/noon" → "midday"; "closing/close" → "closing"; "premarket/pre-market" → "premarket"; "afterhours" → "afterhours"
-
-EXAMPLES:
-
-Input: "S&P five hundred trading at forty-two hundred, up twenty points"
-Output:
-{
-  "full_transcription": "S&P five hundred trading at forty-two hundred, up twenty points",
-  "standardized_quote": "S&P 500 @ 4200 +20 pts",
+  "full_transcription": "TRANSCRIPT_HERE",
+  "standardized_quote": "S&P 500 @ 4212 +23 pts (+0.5%)",
   "index_name": "S&P 500",
   "quote_analysis": {
-    "current_price": 4200,
-    "change_points": 20,
-    "change_percent": null,
+    "current_price": 4212,
+    "change_points": 23,
+    "change_percent": 0.5,
     "intraday_high": null,
     "intraday_low": null,
     "market_direction": "up",
@@ -51,38 +17,13 @@ Output:
   }
 }
 
-Input: "Dow Jones down fifteen points at thirty-four thousand"
-Output:
-{
-  "full_transcription": "Dow Jones down fifteen points at thirty-four thousand",
-  "standardized_quote": "DOW @ 34000 -15 pts",
-  "index_name": "DOW",
-  "quote_analysis": {
-    "current_price": 34000,
-    "change_points": -15,
-    "change_percent": null,
-    "intraday_high": null,
-    "intraday_low": null,
-    "market_direction": "down",
-    "session_context": null
-  }
-}
-
-Input: "NASDAQ higher by fifty points, that's point three percent"
-Output:
-{
-  "full_transcription": "NASDAQ higher by fifty points, that's point three percent",
-  "standardized_quote": "NASDAQ +50 pts (+0.3%)",
-  "index_name": "NASDAQ",
-  "quote_analysis": {
-    "current_price": null,
-    "change_points": 50,
-    "change_percent": 0.3,
-    "intraday_high": null,
-    "intraday_low": null,
-    "market_direction": "up",
-    "session_context": null
-  }
-}
-
-CRITICAL: Extract ONLY actual values from transcript. Return valid JSON with numbers as numbers.
+Rules:
+- Real numbers only
+- null if not mentioned
+- market_direction: "up", "down", "flat"
+- "in B500"/S&P → "S&P 500"
+- Dow → "DOW"
+- Nasdaq → "NASDAQ"
+- DAX → "DAX"
+- Vicks → "VIX"
+- Extract actual values from transcript, not examples

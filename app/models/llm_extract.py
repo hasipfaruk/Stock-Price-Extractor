@@ -144,36 +144,22 @@ def _load_transformers_model(model_name: str = None):
 
 def _format_llama2_prompt(instruction: str, transcript: str, tokenizer=None) -> str:
     """
-    Format prompt for Llama 2 Chat model - optimized for speed
-    Uses tokenizer's chat template if available, otherwise manual format
+    Format prompt for Llama 2 Chat model - matches working code format
+    Embeds transcript in prompt to ensure proper extraction
     """
-    # Simplified prompt format for faster processing
-    user_message = f"""{instruction}
-
-TRANSCRIPT: "{transcript}"
-
-Extract and return JSON."""
-
-    # Try to use tokenizer's chat template (proper Llama 2 format)
-    if tokenizer is not None and hasattr(tokenizer, 'apply_chat_template'):
-        try:
-            messages = [
-                {"role": "system", "content": "Extract financial data. Return JSON only."},
-                {"role": "user", "content": user_message}
-            ]
-            prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            return prompt
-        except Exception:
-            pass  # Fallback to manual format
+    # Escape special characters in transcript
+    safe_transcript = transcript.replace('\\', '\\\\').replace('"', '\\"')
     
-    # Manual Llama 2 format (fallback) - simplified
-    prompt = f"""<s>[INST] <<SYS>>
-Extract financial data. Return JSON only.
-<</SYS>>
-
-{user_message} [/INST]"""
+    # Build prompt matching the working code format
+    prompt_text = (
+        '<s>[INST] <<SYS>>\n'
+        f'{instruction}\n'
+        '<</SYS>>\n\n'
+        f'Transcript: "{safe_transcript}"\n\n'
+        'Return only the JSON now:[/INST]'
+    )
     
-    return prompt
+    return prompt_text
 
 
 def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Optional[Dict]:
@@ -199,16 +185,16 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
                 # Format prompt for Llama 2 (vLLM doesn't need tokenizer for formatting)
                 full_prompt = _format_llama2_prompt(prompt, transcript, tokenizer=None)
                 
-                # Generate with vLLM (optimized for speed - <3s target)
+                # Generate with vLLM (matching working code parameters)
                 outputs = llm.generate(
                     [full_prompt],
                     sampling_params={
-                        "temperature": 0.0,  # Zero temperature for fastest, deterministic output
-                        "max_tokens": min(VLLM_MAX_TOKENS, 200),  # Cap at 200 for speed
-                        "stop": ["</s>", "[INST]", "\n\n\n", "```"],  # Stop sequences including code blocks
-                        "skip_special_tokens": True,  # Skip special tokens for speed
+                        "temperature": 0.0,  # Deterministic output
+                        "max_tokens": 400,  # Match working code
+                        "stop": ["</s>", "[INST]", "\n\n\n"],  # Stop sequences
+                        "skip_special_tokens": True,  # Skip special tokens
                     },
-                    use_tqdm=False,  # Disable progress bar for speed
+                    use_tqdm=False,  # Disable progress bar
                 )
                 
                 # Extract response
@@ -259,18 +245,17 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
         # Move to device
         inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
         
-        # Generate (optimized for speed - <3s target)
+        # Generate (matching working code parameters)
         import torch
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=min(VLLM_MAX_TOKENS, 200),  # Cap at 200 for speed
-                temperature=0.0,  # Zero temperature for fastest inference
-                do_sample=False,  # Greedy decoding for speed
-                pad_token_id=tokenizer.pad_token_id,
+                max_new_tokens=400,  # Match working code
+                do_sample=False,  # Greedy decoding
+                temperature=0.0,  # Deterministic
                 eos_token_id=tokenizer.eos_token_id,
+                pad_token_id=tokenizer.eos_token_id,  # Use eos as pad
                 use_cache=True,  # Enable KV cache for speed
-                num_beams=1,  # Greedy decoding (fastest)
             )
         
         # Decode
@@ -297,36 +282,38 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
 
 
 def _parse_json_response(response: str) -> Optional[Dict]:
-    """Extract and parse JSON from LLM response - optimized for speed"""
-    # Fast path: try direct JSON parsing first
+    """Extract and parse JSON from LLM response - matches working code"""
+    # Extract text after [/INST] if present (matching working code)
+    text = response.split("[/INST]")[-1].strip() if "[/INST]" in response else response
+    
+    # Find JSON object
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        return None
+    
+    json_str = match.group(0)
+    
     try:
-        # Look for JSON object boundaries
-        start_idx = response.find('{')
-        end_idx = response.rfind('}')
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            json_str = response[start_idx:end_idx+1]
-            # Quick cleanup
-            json_str = re.sub(r',\s*}', '}', json_str)
-            json_str = re.sub(r',\s*]', ']', json_str)
-            extracted_data = json.loads(json_str)
-            return extracted_data
-    except (json.JSONDecodeError, ValueError):
-        pass
-    
-    # Fallback: try regex-based extraction
-    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response, re.DOTALL)
-    if json_match:
-        try:
-            json_str = json_match.group(0)
-            json_str = re.sub(r',\s*}', '}', json_str)
-            json_str = re.sub(r',\s*]', ']', json_str)
-            extracted_data = json.loads(json_str)
-            return extracted_data
-        except json.JSONDecodeError:
-            pass
-    
-    # Last resort: extract key-value pairs
-    return _extract_key_value_pairs(response)
+        # Clean up JSON
+        json_str = re.sub(r',\s*}', '}', json_str)
+        json_str = re.sub(r',\s*]', ']', json_str)
+        data = json.loads(json_str)
+        
+        # Normalize numeric fields in quote_analysis (matching working code)
+        if "quote_analysis" in data and isinstance(data["quote_analysis"], dict):
+            q = data["quote_analysis"]
+            for k in ["current_price", "change_points", "change_percent", "intraday_high", "intraday_low"]:
+                if k in q and q[k] is not None:
+                    val = str(q[k]).replace(",", "").strip()
+                    try:
+                        q[k] = float(val) if "." in val else int(val)
+                    except (ValueError, TypeError):
+                        q[k] = None
+        
+        return data
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        print(f" JSON parsing error: {e}")
+        return None
 
 
 def _extract_key_value_pairs(text: str) -> Optional[Dict]:
