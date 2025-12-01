@@ -144,29 +144,21 @@ def _load_transformers_model(model_name: str = None):
 
 def _format_llama2_prompt(instruction: str, transcript: str, tokenizer=None) -> str:
     """
-    Format prompt for Llama 2 Chat model
+    Format prompt for Llama 2 Chat model - optimized for speed
     Uses tokenizer's chat template if available, otherwise manual format
     """
-    # Append transcript to the instruction prompt
-    # The instruction already contains all the rules and examples
+    # Simplified prompt format for faster processing
     user_message = f"""{instruction}
 
-TRANSCRIPT TO ANALYZE:
-"{transcript}"
+TRANSCRIPT: "{transcript}"
 
-Extract the data from the transcript above and return JSON with:
-- full_transcription: the transcript text above
-- standardized_quote: formatted according to the rules
-- index_name: the primary index
-- quote_analysis: object with current_price, change_points, change_percent, intraday_high, intraday_low, market_direction, session_context
-
-Return ONLY valid JSON."""
+Extract and return JSON."""
 
     # Try to use tokenizer's chat template (proper Llama 2 format)
     if tokenizer is not None and hasattr(tokenizer, 'apply_chat_template'):
         try:
             messages = [
-                {"role": "system", "content": "You are an expert financial data extractor. Extract only actual values from transcripts. Return valid JSON only."},
+                {"role": "system", "content": "Extract financial data. Return JSON only."},
                 {"role": "user", "content": user_message}
             ]
             prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -174,9 +166,9 @@ Return ONLY valid JSON."""
         except Exception:
             pass  # Fallback to manual format
     
-    # Manual Llama 2 format (fallback)
+    # Manual Llama 2 format (fallback) - simplified
     prompt = f"""<s>[INST] <<SYS>>
-You are an expert financial data extractor. Extract only actual values from transcripts. Return valid JSON only.
+Extract financial data. Return JSON only.
 <</SYS>>
 
 {user_message} [/INST]"""
@@ -212,8 +204,8 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
                     [full_prompt],
                     sampling_params={
                         "temperature": 0.0,  # Zero temperature for fastest, deterministic output
-                        "max_tokens": VLLM_MAX_TOKENS,  # Reduced for speed
-                        "stop": ["</s>", "[INST]", "\n\n\n"],  # Stop sequences
+                        "max_tokens": min(VLLM_MAX_TOKENS, 200),  # Cap at 200 for speed
+                        "stop": ["</s>", "[INST]", "\n\n\n", "```"],  # Stop sequences including code blocks
                         "skip_special_tokens": True,  # Skip special tokens for speed
                     },
                     use_tqdm=False,  # Disable progress bar for speed
@@ -272,7 +264,7 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=VLLM_MAX_TOKENS,  # Reduced for speed
+                max_new_tokens=min(VLLM_MAX_TOKENS, 200),  # Cap at 200 for speed
                 temperature=0.0,  # Zero temperature for fastest inference
                 do_sample=False,  # Greedy decoding for speed
                 pad_token_id=tokenizer.pad_token_id,
@@ -305,28 +297,35 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
 
 
 def _parse_json_response(response: str) -> Optional[Dict]:
-    """Extract and parse JSON from LLM response"""
-    # Try to find JSON in response
-    # Look for JSON object
-    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response, re.DOTALL)
+    """Extract and parse JSON from LLM response - optimized for speed"""
+    # Fast path: try direct JSON parsing first
+    try:
+        # Look for JSON object boundaries
+        start_idx = response.find('{')
+        end_idx = response.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_str = response[start_idx:end_idx+1]
+            # Quick cleanup
+            json_str = re.sub(r',\s*}', '}', json_str)
+            json_str = re.sub(r',\s*]', ']', json_str)
+            extracted_data = json.loads(json_str)
+            return extracted_data
+    except (json.JSONDecodeError, ValueError):
+        pass
     
+    # Fallback: try regex-based extraction
+    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response, re.DOTALL)
     if json_match:
         try:
             json_str = json_match.group(0)
-            # Clean up common JSON issues
-            json_str = json_str.replace('\n', ' ').replace('\t', ' ')
-            # Remove trailing commas
             json_str = re.sub(r',\s*}', '}', json_str)
             json_str = re.sub(r',\s*]', ']', json_str)
-            
             extracted_data = json.loads(json_str)
             return extracted_data
-        except json.JSONDecodeError as e:
-            print(f" JSON parsing error: {e}")
-            # Try to extract key-value pairs manually
-            return _extract_key_value_pairs(response)
+        except json.JSONDecodeError:
+            pass
     
-    # If no JSON found, try to extract key-value pairs
+    # Last resort: extract key-value pairs
     return _extract_key_value_pairs(response)
 
 

@@ -11,10 +11,10 @@ MODELS_DIR.mkdir(exist_ok=True)  # Create models directory if it doesn't exist
 
 # Whisper model for transcription (client requirement: Whisper family)
 # Choose balance of speed and accuracy; medium is usually best trade-off.
-MODEL_TRANSCRIBE = "openai/whisper-medium"  # Good accuracy, still reasonably fast on GPU
+MODEL_TRANSCRIBE = "openai/whisper-small"  # Faster model for speed optimization
 # Alternative options:
-# "openai/whisper-small"     - Faster but slightly lower accuracy
-# "openai/whisper-large-v2"  - Slowest but highest accuracy
+# "openai/whisper-medium"    - Better accuracy but slower
+# "openai/whisper-large-v2" - Best accuracy but slowest
 
 # Local cache directory for models (stored in project)
 MODEL_CACHE_DIR = str(MODELS_DIR / "cache")
@@ -28,8 +28,8 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # vLLM configuration for GPU-optimized inference (optimized for speed)
 USE_VLLM = (DEVICE == "cuda")  # Use vLLM only on GPU
 VLLM_TENSOR_PARALLEL_SIZE = 1  # Adjust based on GPU count
-VLLM_MAX_MODEL_LEN = 2048  # Context length (sufficient for short transcripts)
-VLLM_MAX_TOKENS = 100  # Limit output tokens for faster generation and <5s total latency
+VLLM_MAX_MODEL_LEN = 1024  # Reduced context length for faster processing
+VLLM_MAX_TOKENS = 150  # Increased slightly for complete JSON but still fast
 
 # LLM model configuration (client requirement: Llama 2)
 # Use Llama 2 chat/instruct model for extraction.

@@ -136,10 +136,9 @@ def transcribe(audio_path: str, model_name: str = None, model_path: str = None):
     for k, v in inputs.items():
         inputs[k] = v.to(DEVICE)
     
-    # Optimized generation settings for speed (<2s target for <6s total)
-    # Distil-Whisper on GPU can achieve <1s transcription for short audio
+    # Optimized generation settings for speed (<2s target)
     generation_kwargs = {
-        "max_length": 256,  # Further reduced for speed (sufficient for short financial audio)
+        "max_length": 128,  # Reduced for speed (sufficient for short financial audio)
         "language": "en",  # Specify English for better accuracy and speed
         "task": "transcribe",
         "return_timestamps": False,  # Disable timestamps for speed
