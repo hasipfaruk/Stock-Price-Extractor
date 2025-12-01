@@ -9,13 +9,12 @@ PROJECT_ROOT = Path(__file__).parent.parent
 MODELS_DIR = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)  # Create models directory if it doesn't exist
 
-# Whisper model for transcription - Optimized for speed (<6s total)
-# Using distil-whisper for fastest transcription while maintaining good accuracy
-MODEL_TRANSCRIBE = "distil-whisper/distil-large-v2"  # Fast, good accuracy
+# Whisper model for transcription (client requirement: Whisper family)
+# Choose balance of speed and accuracy; medium is usually best trade-off.
+MODEL_TRANSCRIBE = "openai/whisper-medium"  # Good accuracy, still reasonably fast on GPU
 # Alternative options:
-# "openai/whisper-medium" - Slower but more accurate
-# "openai/whisper-large-v2" - Slowest but most accurate
-# "openai/whisper-small" - Fastest but lower accuracy
+# "openai/whisper-small"     - Faster but slightly lower accuracy
+# "openai/whisper-large-v2"  - Slowest but highest accuracy
 
 # Local cache directory for models (stored in project)
 MODEL_CACHE_DIR = str(MODELS_DIR / "cache")
@@ -32,10 +31,10 @@ VLLM_TENSOR_PARALLEL_SIZE = 1  # Adjust based on GPU count
 VLLM_MAX_MODEL_LEN = 2048  # Context length (sufficient for short transcripts)
 VLLM_MAX_TOKENS = 100  # Limit output tokens for faster generation and <5s total latency
 
-# LLM model configuration
-# Use a real, publicly available 3B-class instruct model for fast extraction
-# You can change this to any HF causal LM; keep it small (3B–7B) for speed.
-LLM_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
+# LLM model configuration (client requirement: Llama 2)
+# Use Llama 2 chat/instruct model for extraction.
+# Requires accepting Meta's Llama 2 license and (usually) a Hugging Face token.
+LLM_MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf"
 
 # Processing settings
 # Keep clips short to guarantee latency bounds
@@ -45,8 +44,8 @@ SAMPLE_RATE = 16000
 # CPU-specific optimizations
 USE_CPU_OPTIMIZATIONS = (DEVICE == "cpu")
 
-# Performance targets (optimized for 3B model - should be even faster!)
-TARGET_LATENCY_SECONDS = 5.0  # End-to-end latency target (<5s)
-TARGET_TRANSCRIBE_SECONDS = 2.0  # Transcription target (<2s)
-TARGET_LLM_SECONDS = 2.0  # LLM extraction target (<2s with 3B model - faster!)
+# Performance targets (GPU, Llama 2 7B + Whisper-medium, short audio)
+TARGET_LATENCY_SECONDS = 5.0    # End-to-end latency target (<5s) on a good GPU
+TARGET_TRANSCRIBE_SECONDS = 2.5  # Transcription target (<2.5s)
+TARGET_LLM_SECONDS = 2.5        # LLM extraction target (<2.5s)
 
