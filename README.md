@@ -2,25 +2,25 @@
 
 A powerful, **100% open-source** solution for extracting stock index price information from audio recordings using **Llama 2** LLM and **Whisper** ASR. Optimized for speed and accuracy with proper JSON output format.
 
-## 📋 Recent Updates
+##  Recent Updates
 
-✅ **Optimized Output Format** - Client-required JSON structure with `quote_analysis` object  
-✅ **Speed Optimizations** - Faster processing with optimized prompts and parameters  
-✅ **Unique Extraction** - Each transcript extracts unique values (no copying)  
-✅ **Proper Data Types** - Numbers as numbers, not strings  
-✅ **100% LLM-Only** - No regex fallbacks, purely LLM-based extraction  
+ **Optimized Output Format** - Client-required JSON structure with `quote_analysis` object  
+ **Speed Optimizations** - Faster processing with optimized prompts and parameters  
+ **Unique Extraction** - Each transcript extracts unique values (no copying)  
+ **Proper Data Types** - Numbers as numbers, not strings  
+ **100% LLM-Only** - No regex fallbacks, purely LLM-based extraction  
 
-## 🔒 Client Requirements Compliance
+##  Client Requirements Compliance
 
-✅ **Open-Source Only** - Llama 2 instruction-tuned models (NO OpenAI/Gemini/proprietary models)  
-✅ **GPU Optimized** - vLLM with FP16, optimized for fast processing  
-✅ **High-Quality ASR** - Whisper Small/Medium for accurate transcription  
-✅ **100% LLM Extraction** - NO regex fallbacks, purely LLM-based natural language understanding  
-✅ **Standardized Output** - Client-required JSON format with all fields  
+ **Open-Source Only** - Llama 2 instruction-tuned models (NO OpenAI/Gemini/proprietary models)  
+ **GPU Optimized** - vLLM with FP16, optimized for fast processing  
+ **High-Quality ASR** - Whisper Small/Medium for accurate transcription  
+ **100% LLM Extraction** - NO regex fallbacks, purely LLM-based natural language understanding  
+ **Standardized Output** - Client-required JSON format with all fields  
 
-⚠️ **IMPORTANT: PROMPT REQUIRED** - This solution uses **100% LLM-only** extraction (Llama 2). A custom extraction prompt file (`example_prompt.txt`) is **REQUIRED** for all extraction operations.
+ **IMPORTANT: PROMPT REQUIRED** - This solution uses **100% LLM-only** extraction (Llama 2). A custom extraction prompt file (`example_prompt.txt`) is **REQUIRED** for all extraction operations.
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Installation
 
@@ -31,7 +31,7 @@ pip install -r requirements.txt
 
 ### Usage Options
 
-#### 1. **Streamlit Web App** - Recommended (Easiest to Use) ⭐
+#### 1. **Streamlit Web App** - Recommended (Easiest to Use) 
 
 ```bash
 # Install streamlit (if not already installed)
@@ -89,19 +89,19 @@ print(extraction['quote_analysis']['current_price'])
 print(extraction['quote_analysis']['change_points'])
 ```
 
-## 📋 Features
+##  Features
 
-- ✅ **100% Open-Source**: Llama 2 + Whisper (NO proprietary models)
-- ✅ **GPU-Optimized**: vLLM with FP16, optimized for speed
-- ✅ **LLM Extraction**: Full natural language understanding of price expressions
-- ✅ **Robust Validation**: Data normalization with strict output structure
-- ✅ **Fast Processing**: Optimized prompts and parameters for speed
-- ✅ **Cross-Platform**: Works on Windows, Linux, and macOS
-- ✅ **CPU/GPU Support**: Auto-detects and optimizes for your hardware
-- ✅ **Local Models**: All models stored in project directory
-- ✅ **Batch Processing**: Process multiple files at once
+-  **100% Open-Source**: Llama 2 + Whisper (NO proprietary models)
+-  **GPU-Optimized**: vLLM with FP16, optimized for speed
+-  **LLM Extraction**: Full natural language understanding of price expressions
+-  **Robust Validation**: Data normalization with strict output structure
+-  **Fast Processing**: Optimized prompts and parameters for speed
+-  **Cross-Platform**: Works on Windows, Linux, and macOS
+-  **CPU/GPU Support**: Auto-detects and optimizes for your hardware
+-  **Local Models**: All models stored in project directory
+-  **Batch Processing**: Process multiple files at once
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 bloomberg-audio-price-extractor/
@@ -124,7 +124,7 @@ bloomberg-audio-price-extractor/
 └── README.md
 ```
 
-## 📊 Output Format
+##  Output Format
 
 The system returns JSON in the following format:
 
@@ -244,7 +244,7 @@ TARGET_LLM_SECONDS = 2.5
 - CUDA GPU (recommended, for faster processing)
 - Hugging Face account with Llama 2 access
 
-## 📦 Installation Details
+##  Installation Details
 
 ### Dependencies
 
@@ -313,7 +313,7 @@ for audio_file in Path("audios").glob("*.wav"):
     results[audio_file.name] = extraction
 ```
 
-## 🚀 Performance
+##  Performance
 
 **Target: < 5 seconds end-to-end processing per file**
 
@@ -329,7 +329,7 @@ for audio_file in Path("audios").glob("*.wav"):
 
 Use `--verbose` flag to see detailed timing information.
 
-## 📝 Prompt File
+##  Prompt File
 
 The `example_prompt.txt` file contains the extraction instructions for the LLM. It defines:
 - Output JSON format
@@ -374,27 +374,27 @@ with open("batch_results.json", "w") as f:
     json.dump(results, f, indent=2)
 ```
 
-## 📚 Documentation
+##  Documentation
 
 - **Configuration**: See `app/config.py` for model and performance settings
 - **Model Caching**: See `MODEL_CACHING.md` for caching information
 - **Speed Optimizations**: See `SPEED_OPTIMIZATIONS.md` for performance tips
 
-## 📝 License
+##  License
 
 This project uses open-source models:
 - **Whisper**: MIT License
 - **Transformers**: Apache 2.0
 - **Llama 2**: Custom License (requires acceptance)
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions welcome! Feel free to submit issues or pull requests.
 
-## 📞 Support
+##  Support
 
 For questions or issues, please open an issue on the repository.
 
 ---
 
-**Made for everyone** - Use it as a CLI tool, Python library, or web service! 🎉
+**Made for everyone** - Use it as a CLI tool, Python library, or web service! 
