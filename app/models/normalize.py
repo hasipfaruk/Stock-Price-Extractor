@@ -93,6 +93,23 @@ def validate_and_normalize_extraction(extracted: Dict) -> Optional[Dict]:
             # Set to None to force re-extraction or indicate error
             extracted[key] = None
     
+    # Check for common example values that might be copied
+    example_values = {
+        'index_name': ['S&P 500', 'S&P500'],
+        'price': ['4500'],
+        'change': ['+12'],
+        'change_percent': ['+0.27%', '+0.27'],
+        'session': ['PREMARKET']
+    }
+    
+    # Warn if exact example values are detected (but don't reject - might be legitimate)
+    for key, example_list in example_values.items():
+        if key in extracted and extracted[key]:
+            value_str = str(extracted[key]).strip()
+            if value_str in example_list:
+                print(f"⚠️ Warning: {key} has value '{value_str}' which matches example values.")
+                print(f"   Verify this is actually in the transcript and not copied from examples.")
+    
     # Normalize all fields
     normalized = {
         'index_name': normalize_index_name(extracted.get('index_name')),

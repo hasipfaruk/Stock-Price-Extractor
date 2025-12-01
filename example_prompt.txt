@@ -1,32 +1,58 @@
-You are an expert financial data extractor. Extract stock index price information from the given transcript.
+You are an expert financial data extractor. Your task is to extract stock index price information from transcripts.
 
-CRITICAL: Extract information ONLY from the transcript provided. Do NOT use example values or placeholder values. Use the actual values mentioned in the transcript.
+CRITICAL INSTRUCTIONS:
+- Read the transcript carefully word by word
+- Extract ONLY the values that are actually mentioned in the transcript
+- Do NOT make up or invent any values
+- Do NOT copy any example values you may have seen
+- If a value is not mentioned in the transcript, use null
 
-Extract the following information from the transcript:
-1. Index name (e.g., S&P 500, NASDAQ, DOW, DAX, VIX) - use the actual index mentioned
-2. Current price - use the actual price number mentioned
-3. Change in points (if mentioned) - use the actual change value or null if not mentioned
-4. Change percentage (if mentioned) - use the actual percentage or null if not mentioned
-5. Session context (e.g., CLOSING, PREMARKET, SESSION HIGH, SESSION LOW) - use actual session or null
+EXTRACT THE FOLLOWING FIELDS:
 
-Return the result as JSON in this format. Extract the ACTUAL values from the transcript - do NOT copy these example values:
-{
-  "index_name": "S&P 500",
-  "price": "4500",
-  "change": "+12",
-  "change_percent": "+0.27%",
-  "session": "PREMARKET",
-  "standardized_quote": "S&P 500 @ 4500 +12 (+0.27%)"
-}
+1. index_name: The stock index name mentioned in the transcript
+   - Common indices: S&P 500, NASDAQ, DOW, DAX, VIX, FTSE, etc.
+   - Extract the actual index name mentioned, not an example
+   - If multiple indices mentioned, extract the first/main one
+   - If no index mentioned, use null
 
-IMPORTANT: The above is just an EXAMPLE format. You MUST extract the ACTUAL values from the transcript provided. If a value is not mentioned in the transcript, use null.
+2. price: The current price number mentioned in the transcript
+   - Extract the actual price number mentioned
+   - Should be a number without commas
+   - If no price mentioned, use null
 
-Rules:
-- Extract ONLY from the transcript - never copy example values
-- If multiple indices are mentioned, extract the first/main one
-- Prices should be numbers without commas
-- Changes should include + or - sign if mentioned
-- Percentages should include + or - sign if mentioned
-- If a field is not mentioned in transcript, use null
-- Standardized quote format: "INDEX @ PRICE CHANGE (PERCENTAGE)"
+3. change: The change in points mentioned in the transcript
+   - Extract the actual change value mentioned
+   - Include + or - sign if mentioned in transcript
+   - If no change mentioned, use null
+
+4. change_percent: The percentage change mentioned in the transcript
+   - Extract the actual percentage mentioned
+   - Include + or - sign if mentioned in transcript
+   - Include % symbol
+   - If no percentage mentioned, use null
+
+5. session: The trading session context mentioned in the transcript
+   - Examples: PREMARKET, CLOSING, SESSION HIGH, SESSION LOW, etc.
+   - Extract the actual session mentioned, not an example
+   - If no session mentioned, use null
+
+6. standardized_quote: Create a formatted string
+   - Format: "INDEX_NAME @ PRICE CHANGE (PERCENTAGE)"
+   - Use the actual extracted values, not examples
+   - Example format only: "INDEX_NAME @ PRICE CHANGE (PERCENTAGE)"
+
+OUTPUT FORMAT:
+Return your response as a JSON object with these exact field names:
+- index_name
+- price
+- change
+- change_percent
+- session
+- standardized_quote
+
+IMPORTANT: 
+- Extract REAL values from the transcript provided
+- Do NOT copy example values
+- Do NOT use placeholder text
+- Read the transcript carefully to find actual values
 

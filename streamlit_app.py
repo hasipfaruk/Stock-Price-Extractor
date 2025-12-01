@@ -439,6 +439,20 @@ if process_button:
         status_text.text("✅ Processing complete!")
         progress_bar.progress(1.0)
         
+        # Check for duplicate results (indicates LLM copying example values)
+        success_results = [r for r in all_results.values() if r.get("status") == "success" and r.get("data")]
+        if len(success_results) > 1:
+            # Check if all data fields are identical
+            first_data = success_results[0].get("data", {})
+            all_identical = all(
+                r.get("data", {}) == first_data 
+                for r in success_results[1:]
+            )
+            if all_identical:
+                st.error("⚠️ **WARNING: All extraction results are identical!**")
+                st.warning("This suggests the LLM may be copying example values from the prompt instead of extracting from transcripts.")
+                st.info("**Check:**\n- Verify the prompt file doesn't contain example JSON values\n- Ensure each transcript is being processed uniquely\n- Review the extracted values vs actual transcript content")
+        
         # Display results
         st.markdown("### 📈 Results Summary")
         
