@@ -147,35 +147,26 @@ def _format_llama2_prompt(instruction: str, transcript: str, tokenizer=None) -> 
     Format prompt for Llama 2 Chat model
     Uses tokenizer's chat template if available, otherwise manual format
     """
-    # Build user message - make it VERY clear to use transcript values only
-    # IMPORTANT: Do NOT include any example values that could be copied
-    user_message = f"""Read this transcript and extract financial data:
+    # Append transcript to the instruction prompt
+    # The instruction already contains all the rules and examples
+    user_message = f"""{instruction}
 
+TRANSCRIPT TO ANALYZE:
 "{transcript}"
 
-Extract these fields from the transcript above. Read each word carefully:
+Extract the data from the transcript above and return JSON with:
+- full_transcription: the transcript text above
+- standardized_quote: formatted according to the rules
+- index_name: the primary index
+- quote_analysis: object with current_price, change_points, change_percent, intraday_high, intraday_low, market_direction, session_context
 
-1. index_name: What stock index is mentioned? (Examples of possible indices: S&P 500, NASDAQ, DOW, DAX, VIX, FTSE - but extract the ACTUAL one mentioned in the transcript above)
-2. price: What price number is mentioned? Extract the actual number.
-3. change: What change in points is mentioned? Include + or - sign if present, otherwise null.
-4. change_percent: What percentage change is mentioned? Include + or - sign if present, otherwise null.
-5. session: What trading session is mentioned? (PREMARKET, CLOSING, SESSION HIGH, etc., or null if not mentioned)
-6. standardized_quote: Format as "INDEX @ PRICE CHANGE (PERCENTAGE)" using the values you extracted
-
-CRITICAL RULES:
-- Extract ONLY what is actually written in the transcript above
-- Do NOT invent values
-- Do NOT copy values from examples
-- If the transcript doesn't mention something, use null
-- Read the transcript word by word to find real values
-
-Return JSON with these fields. Use the actual values from the transcript:"""
+Return ONLY valid JSON."""
 
     # Try to use tokenizer's chat template (proper Llama 2 format)
     if tokenizer is not None and hasattr(tokenizer, 'apply_chat_template'):
         try:
             messages = [
-                {"role": "system", "content": instruction},
+                {"role": "system", "content": "You are an expert financial data extractor. Extract only actual values from transcripts. Return valid JSON only."},
                 {"role": "user", "content": user_message}
             ]
             prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -185,7 +176,7 @@ Return JSON with these fields. Use the actual values from the transcript:"""
     
     # Manual Llama 2 format (fallback)
     prompt = f"""<s>[INST] <<SYS>>
-{instruction}
+You are an expert financial data extractor. Extract only actual values from transcripts. Return valid JSON only.
 <</SYS>>
 
 {user_message} [/INST]"""
@@ -235,8 +226,8 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
                 extracted_data = _parse_json_response(response)
                 
                 if extracted_data:
-                    # Normalize and validate
-                    normalized = validate_and_normalize_extraction(extracted_data)
+                    # Normalize and validate (pass transcript for full_transcription field)
+                    normalized = validate_and_normalize_extraction(extracted_data, transcript=transcript)
                     elapsed = time.time() - start_time
                     if elapsed > TARGET_LLM_SECONDS:
                         print(f"⚠️ LLM extraction took {elapsed:.2f}s (target: <{TARGET_LLM_SECONDS:.2f}s)")
@@ -297,8 +288,8 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
         extracted_data = _parse_json_response(response)
         
         if extracted_data:
-            # Normalize and validate
-            normalized = validate_and_normalize_extraction(extracted_data)
+            # Normalize and validate (pass transcript for full_transcription field)
+            normalized = validate_and_normalize_extraction(extracted_data, transcript=transcript)
             elapsed = time.time() - start_time
             if elapsed > TARGET_LLM_SECONDS:
                 print(f"⚠️ LLM extraction took {elapsed:.2f}s (target: <{TARGET_LLM_SECONDS:.2f}s)")

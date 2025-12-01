@@ -62,63 +62,164 @@ def _is_placeholder_value(value: Any) -> bool:
         'EXTRACT THE ACTUAL',
         'EXTRACT FROM TRANSCRIPT',
         'INDEX @ PRICE CHANGE',
+        'PRICE INFORMATION FROM TRANSCRIPTS',
+        'INFORMATION FROM TRANSCRIPTS',
+        'THE STOCK INDEX NAME MENTIONED',
+        'THE CHANGE IN POINTS MENTIONED',
+        'THE PERCENTAGE CHANGE MENTIONED',
+        'THE TRADING SESSION CONTEXT MENTIONED',
+        'MENTIONED IN THE TRANSCRIPT',
+        'FROM THE TRANSCRIPT',
+        'IN THE TRANSCRIPT',
+        'THE TRANSCRIPT',
     ]
     
+    # Check for instruction-like text (contains multiple instruction keywords)
+    instruction_keywords = ['MENTIONED', 'TRANSCRIPT', 'EXTRACT', 'INFORMATION', 'CONTEXT']
+    keyword_count = sum(1 for keyword in instruction_keywords if keyword in value_str)
+    
+    # If value contains 2+ instruction keywords, it's likely instruction text
+    if keyword_count >= 2:
+        return True
+    
+    # Check for specific placeholder patterns
     for pattern in placeholder_patterns:
         if pattern in value_str:
             return True
     
+    # Check if value looks like a sentence/instruction rather than data
+    if len(value_str) > 30 and any(word in value_str for word in ['THE', 'FROM', 'IN', 'MENTIONED', 'EXTRACT']):
+        # Likely instruction text if it's long and contains instruction words
+        return True
+    
     return False
 
 
-def validate_and_normalize_extraction(extracted: Dict) -> Optional[Dict]:
+def _normalize_number(value: Any) -> Optional[float]:
+    """Convert value to number (float) or return None"""
+    if value is None or value == "":
+        return None
+    
+    if isinstance(value, (int, float)):
+        return float(value)
+    
+    value_str = str(value).strip()
+    if value_str.lower() in ['none', 'null', 'n/a', 'na', '']:
+        return None
+    
+    # Remove +, -, %, and other non-numeric characters except decimal point
+    cleaned = value_str.replace('+', '').replace('-', '').replace('%', '').replace(',', '').strip()
+    
+    try:
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return None
+
+
+def _normalize_market_direction(value: Any) -> Optional[str]:
+    """Normalize market direction to 'up', 'down', or 'flat'"""
+    if value is None:
+        return None
+    
+    value_str = str(value).strip().lower()
+    
+    if any(word in value_str for word in ['up', 'higher', 'gaining', 'advancing', 'rallying', 'positive']):
+        return 'up'
+    elif any(word in value_str for word in ['down', 'lower', 'falling', 'declining', 'negative']):
+        return 'down'
+    elif any(word in value_str for word in ['flat', 'unchanged', 'little changed', 'barely']):
+        return 'flat'
+    
+    return None
+
+
+def _normalize_session_context(value: Any) -> Optional[str]:
+    """Normalize session context to lowercase standard format"""
+    if value is None:
+        return None
+    
+    value_str = str(value).strip().lower()
+    
+    # Map to standard session names
+    session_map = {
+        'opening': 'opening',
+        'open': 'opening',
+        'midday': 'midday',
+        'noon': 'midday',
+        'closing': 'closing',
+        'close': 'closing',
+        'premarket': 'premarket',
+        'pre-market': 'premarket',
+        'afterhours': 'afterhours',
+        'after hours': 'afterhours',
+        'overnight': 'overnight',
+    }
+    
+    for key, normalized in session_map.items():
+        if key in value_str:
+            return normalized
+    
+    return value_str if value_str else None
+
+
+def validate_and_normalize_extraction(extracted: Dict, transcript: str = None) -> Optional[Dict]:
     """
     Validate and normalize extracted financial data
-    Ensures consistent output structure
+    Ensures consistent output structure matching client requirements
     
     Args:
         extracted: Dictionary with extracted data
+        transcript: Original transcript text (optional, for full_transcription field)
         
     Returns:
-        Normalized and validated dictionary
+        Normalized and validated dictionary with client-required format
     """
     if not extracted or not isinstance(extracted, dict):
         return None
     
     # Check for placeholder values - reject if found
+    placeholder_fields = []
     for key, value in extracted.items():
-        if _is_placeholder_value(value):
+        if key == 'quote_analysis' and isinstance(value, dict):
+            # Check nested quote_analysis fields
+            for sub_key, sub_value in value.items():
+                if _is_placeholder_value(sub_value):
+                    print(f"⚠️ Warning: Detected placeholder value in {key}.{sub_key}: {sub_value}")
+                    placeholder_fields.append(f"{key}.{sub_key}")
+        elif _is_placeholder_value(value):
             print(f"⚠️ Warning: Detected placeholder value in {key}: {value}")
-            print("   This suggests the LLM copied example text instead of extracting real values.")
-            # Set to None to force re-extraction or indicate error
-            extracted[key] = None
+            print("   This suggests the LLM copied instruction text instead of extracting real values.")
+            placeholder_fields.append(key)
     
-    # Check for common example values that might be copied
-    example_values = {
-        'index_name': ['S&P 500', 'S&P500'],
-        'price': ['4500'],
-        'change': ['+12'],
-        'change_percent': ['+0.27%', '+0.27'],
-        'session': ['PREMARKET']
-    }
+    # If too many placeholder values detected, reject the entire extraction
+    if len(placeholder_fields) >= 3:
+        print(f"❌ Error: Too many placeholder values detected in fields: {placeholder_fields}")
+        print("   The LLM copied instruction text instead of extracting from transcript.")
+        return None
     
-    # Warn if exact example values are detected (but don't reject - might be legitimate)
-    for key, example_list in example_values.items():
-        if key in extracted and extracted[key]:
-            value_str = str(extracted[key]).strip()
-            if value_str in example_list:
-                print(f"⚠️ Warning: {key} has value '{value_str}' which matches example values.")
-                print(f"   Verify this is actually in the transcript and not copied from examples.")
-    
-    # Normalize all fields
+    # Build normalized output in client-required format
     normalized = {
-        'index_name': normalize_index_name(extracted.get('index_name')),
-        'price': normalize_numeric(extracted.get('price')),
-        'change': normalize_numeric(extracted.get('change')),
-        'change_percent': normalize_percentage(extracted.get('change_percent')),
-        'session': normalize_index_name(extracted.get('session')),
-        'standardized_quote': str(extracted.get('standardized_quote', '')).strip() or None,
+        'full_transcription': transcript or extracted.get('full_transcription') or '',
+        'standardized_quote': str(extracted.get('standardized_quote', '')).strip() or '',
+        'index_name': normalize_index_name(extracted.get('index_name')) or '',
     }
     
-    # Filter out None values for cleaner output
-    return {k: v for k, v in normalized.items() if v is not None}
+    # Handle quote_analysis object
+    quote_analysis = extracted.get('quote_analysis', {})
+    if not isinstance(quote_analysis, dict):
+        quote_analysis = {}
+    
+    normalized['quote_analysis'] = {
+        'current_price': _normalize_number(quote_analysis.get('current_price')),
+        'change_points': _normalize_number(quote_analysis.get('change_points')),
+        'change_percent': _normalize_number(quote_analysis.get('change_percent')),
+        'intraday_high': _normalize_number(quote_analysis.get('intraday_high')),
+        'intraday_low': _normalize_number(quote_analysis.get('intraday_low')),
+        'market_direction': _normalize_market_direction(quote_analysis.get('market_direction')),
+        'session_context': _normalize_session_context(quote_analysis.get('session_context')),
+    }
+    
+    # Remove None values from quote_analysis for cleaner output (but keep structure)
+    # Note: Client may want null values, so we keep them as None (which becomes null in JSON)
+    
+    return normalized
