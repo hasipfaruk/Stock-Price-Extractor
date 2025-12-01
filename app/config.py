@@ -32,13 +32,10 @@ VLLM_TENSOR_PARALLEL_SIZE = 1  # Adjust based on GPU count
 VLLM_MAX_MODEL_LEN = 2048  # Context length (sufficient for short transcripts)
 VLLM_MAX_TOKENS = 100  # Limit output tokens for faster generation and <5s total latency
 
-# Mistral model configuration
-# Using smallest Mistral model (3B) for fastest processing and lowest memory usage
-LLM_MODEL_NAME = "mistralai/Mistral-3B"  # Smallest: 3B model (fastest, ~6GB)
-# If above model not available, try these alternatives (in order):
-# "mistralai/Mistral-3B" - Base 3B model (if instruct version unavailable)
-# "mistralai/Mistral-7B-Instruct-v0.2" - Larger 7B model (slower, ~14GB)
-# "mistralai/Mixtral-8x7B-Instruct-v0.1" - Mixtral (requires more GPU memory, ~47GB)
+# LLM model configuration
+# Use a real, publicly available 3B-class instruct model for fast extraction
+# You can change this to any HF causal LM; keep it small (3B–7B) for speed.
+LLM_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
 
 # Processing settings
 # Keep clips short to guarantee latency bounds
