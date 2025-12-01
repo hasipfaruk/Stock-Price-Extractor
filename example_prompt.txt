@@ -1,26 +1,30 @@
 You are an expert financial data extractor. Extract stock index price information from the given transcript.
 
-Extract the following information:
-1. Index name (e.g., S&P 500, NASDAQ, DOW, DAX, VIX)
-2. Current price
-3. Change in points (if mentioned)
-4. Change percentage (if mentioned)
-5. Session context (e.g., CLOSING, PREMARKET, SESSION HIGH, SESSION LOW)
+CRITICAL: Extract information ONLY from the transcript provided. Do NOT use example values or placeholder values. Use the actual values mentioned in the transcript.
 
-Return the result as JSON in this format:
+Extract the following information from the transcript:
+1. Index name (e.g., S&P 500, NASDAQ, DOW, DAX, VIX) - use the actual index mentioned
+2. Current price - use the actual price number mentioned
+3. Change in points (if mentioned) - use the actual change value or null if not mentioned
+4. Change percentage (if mentioned) - use the actual percentage or null if not mentioned
+5. Session context (e.g., CLOSING, PREMARKET, SESSION HIGH, SESSION LOW) - use actual session or null
+
+Return the result as JSON in this format (replace ALL values with actual values from transcript):
 {
-  "index_name": "S&P 500",
-  "price": "4212",
-  "change": "+23",
-  "change_percent": "+0.5",
-  "session": null,
-  "standardized_quote": "S&P 500 @ 4212 +23 pts (+0.5%)"
+  "index_name": "ACTUAL_INDEX_FROM_TRANSCRIPT",
+  "price": "ACTUAL_PRICE_FROM_TRANSCRIPT",
+  "change": "ACTUAL_CHANGE_OR_NULL",
+  "change_percent": "ACTUAL_PERCENTAGE_OR_NULL",
+  "session": "ACTUAL_SESSION_OR_NULL",
+  "standardized_quote": "INDEX @ PRICE CHANGE (PERCENTAGE)"
 }
 
 Rules:
+- Extract ONLY from the transcript - never copy example values
 - If multiple indices are mentioned, extract the first/main one
 - Prices should be numbers without commas
-- Changes should include + or - sign
-- Percentages should include + or - sign
+- Changes should include + or - sign if mentioned
+- Percentages should include + or - sign if mentioned
+- If a field is not mentioned in transcript, use null
 - Standardized quote format: "INDEX @ PRICE CHANGE (PERCENTAGE)"
 

@@ -96,9 +96,9 @@ def _load_transformers_model(model_name: str = None):
             from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
             
-            print(f"Loading Mistral 3B model with transformers: {model_id}")
+            print(f"Loading Llama 2 model with transformers: {model_id}")
             print("This may take a few minutes on first run...")
-            print("💡 Using smallest model (3B) for fastest processing (~6GB memory)")
+            print("💡 Using Llama-2-7B for extraction (~14GB memory on GPU)")
             
             # Load tokenizer
             _transformers_tokenizer = AutoTokenizer.from_pretrained(
@@ -142,36 +142,55 @@ def _load_transformers_model(model_name: str = None):
     return _transformers_model, _transformers_tokenizer
 
 
-def _format_mistral_prompt(instruction: str, transcript: str) -> str:
+def _format_llama2_prompt(instruction: str, transcript: str, tokenizer=None) -> str:
     """
-    Format prompt for Mistral Instruct model
-    Mistral uses a specific chat format
+    Format prompt for Llama 2 Chat model
+    Uses tokenizer's chat template if available, otherwise manual format
     """
-    # Mistral Instruct chat template
-    prompt = f"""<s>[INST] {instruction}
-
-Transcript:
+    # Build user message - make it VERY clear to use transcript values only
+    user_message = f"""Transcript to extract from:
 {transcript}
 
-Extract the information and return as JSON with the following structure:
+IMPORTANT: Extract information ONLY from the transcript above. Do NOT copy any example values - use the actual values mentioned in the transcript.
+
+Return JSON with this structure (replace ALL placeholder values with actual values from transcript):
 {{
-    "index_name": "S&P 500",
-    "price": "5234.12",
-    "change": "+23",
-    "change_percent": "+0.5",
-    "session": "CLOSING",
+    "index_name": "ACTUAL_INDEX_FROM_TRANSCRIPT",
+    "price": "ACTUAL_PRICE_FROM_TRANSCRIPT",
+    "change": "ACTUAL_CHANGE_OR_NULL",
+    "change_percent": "ACTUAL_PERCENTAGE_OR_NULL",
+    "session": "ACTUAL_SESSION_OR_NULL",
     "session_high": null,
     "session_low": null
 }}
 
-Return only valid JSON, no additional text. [/INST]"""
+Return ONLY valid JSON, no explanation."""
+
+    # Try to use tokenizer's chat template (proper Llama 2 format)
+    if tokenizer is not None and hasattr(tokenizer, 'apply_chat_template'):
+        try:
+            messages = [
+                {"role": "system", "content": instruction},
+                {"role": "user", "content": user_message}
+            ]
+            prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            return prompt
+        except Exception:
+            pass  # Fallback to manual format
+    
+    # Manual Llama 2 format (fallback)
+    prompt = f"""<s>[INST] <<SYS>>
+{instruction}
+<</SYS>>
+
+{user_message} [/INST]"""
     
     return prompt
 
 
 def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Optional[Dict]:
     """
-    Extract stock price information using Mistral with vLLM (GPU) or transformers (CPU)
+    Extract stock price information using Llama 2 with vLLM (GPU) or transformers (CPU)
     Optimized for <3s latency
     
     Args:
@@ -189,8 +208,8 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
         llm = _load_vllm_model(model_name)
         if llm is not None:
             try:
-                # Format prompt for Mistral
-                full_prompt = _format_mistral_prompt(prompt, transcript)
+                # Format prompt for Llama 2 (vLLM doesn't need tokenizer for formatting)
+                full_prompt = _format_llama2_prompt(prompt, transcript, tokenizer=None)
                 
                 # Generate with vLLM (optimized for speed - <3s target)
                 outputs = llm.generate(
@@ -230,8 +249,15 @@ def extract_with_llm(transcript: str, prompt: str, model_name: str = None) -> Op
         return None
     
     try:
-        # Format prompt for Mistral
-        full_prompt = _format_mistral_prompt(prompt, transcript)
+        # Format prompt for Llama 2 (use tokenizer's chat template if available)
+        full_prompt = _format_llama2_prompt(prompt, transcript, tokenizer=tokenizer)
+        
+        # Debug: Print first 200 chars of transcript to verify uniqueness (only in verbose mode)
+        if len(transcript) > 0:
+            transcript_preview = transcript[:200] + ("..." if len(transcript) > 200 else "")
+            # Only print if we're in a debug context (can be controlled by env var)
+            if os.environ.get("DEBUG_TRANSCRIPTS", "0") == "1":
+                print(f"  [DEBUG] Transcript preview: {transcript_preview}")
         
         # Tokenize
         inputs = tokenizer(
@@ -351,5 +377,5 @@ def extract_with_long_prompt(transcript: str, prompt_file: str = None, prompt_te
     else:
         return None
     
-    # Use Mistral for extraction
+    # Use Llama 2 for extraction
     return extract_with_llm(transcript, prompt)
