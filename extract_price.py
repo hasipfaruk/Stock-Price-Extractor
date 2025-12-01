@@ -143,22 +143,18 @@ Examples:
                 print("Ensure your prompt is correct and the LLM can parse the transcript", file=sys.stderr)
                 sys.exit(1)
             
-            # Build result with LLM extraction only
+            # Build result with new format (matching client requirements)
             result = {
-                "index_name": llm_result.get('index_name'),
-                "price": llm_result.get('price'),
-                "change": llm_result.get('change'),
-                "change_percent": llm_result.get('change_percent'),
-                "session": llm_result.get('session'),
+                "full_transcription": llm_result.get('full_transcription', transcript),
                 "standardized_quote": llm_result.get('standardized_quote'),
-                "transcript": transcript,
+                "index_name": llm_result.get('index_name'),
+                "quote_analysis": llm_result.get('quote_analysis', {}),
                 "timing": {
                     "transcription_s": round(trans_time, 3),
                     "extraction_s": round(extract_duration, 3),
                     "total_s": round(total_duration, 3)
                 },
                 "extraction_method": "LLM (Llama 2)",
-                "note": "100% LLM-powered extraction. No regex fallback.",
                 "model": "meta-llama/Llama-2-7b-chat-hf"
             }
         
@@ -201,26 +197,44 @@ def print_result(result: dict, verbose: bool = False):
     print("="*60)
     
     index = result.get('index_name')
-    price = result.get('price')
+    quote_analysis = result.get('quote_analysis', {})
     
     if index:
         print(f"\n[INDEX] Index: {index}")
     else:
-        print("\n[INDEX] Index: Not extracted by LLM")
+        print("\n[INDEX] Index: Not extracted")
     
-    if price:
-        print(f"[PRICE] Price: {price}")
+    current_price = quote_analysis.get('current_price')
+    if current_price is not None:
+        print(f"[PRICE] Price: {current_price}")
     else:
-        print("[PRICE] Price: Not extracted by LLM")
+        print("[PRICE] Price: Not mentioned")
     
-    if result.get('change'):
-        print(f"[CHANGE] Change: {result['change']}")
+    change_points = quote_analysis.get('change_points')
+    if change_points is not None:
+        sign = "+" if change_points >= 0 else ""
+        print(f"[CHANGE] Change: {sign}{change_points} pts")
     
-    if result.get('change_percent'):
-        print(f"[CHANGE %] Change %: {result['change_percent']}")
+    change_percent = quote_analysis.get('change_percent')
+    if change_percent is not None:
+        sign = "+" if change_percent >= 0 else ""
+        print(f"[CHANGE %] Change %: {sign}{change_percent}%")
     
-    if result.get('session'):
-        print(f"[SESSION] Session: {result['session']}")
+    intraday_high = quote_analysis.get('intraday_high')
+    if intraday_high is not None:
+        print(f"[HIGH] Intraday High: {intraday_high}")
+    
+    intraday_low = quote_analysis.get('intraday_low')
+    if intraday_low is not None:
+        print(f"[LOW] Intraday Low: {intraday_low}")
+    
+    market_direction = quote_analysis.get('market_direction')
+    if market_direction:
+        print(f"[DIRECTION] Market Direction: {market_direction.upper()}")
+    
+    session_context = quote_analysis.get('session_context')
+    if session_context:
+        print(f"[SESSION] Session: {session_context.upper()}")
     
     if result.get('standardized_quote'):
         print(f"\n[QUOTE] {result['standardized_quote']}")
@@ -238,16 +252,13 @@ def print_result(result: dict, verbose: bool = False):
     
     if verbose:
         print(f"\n[TRANSCRIPT]")
-        print(f"   {result.get('transcript', 'N/A')}")
+        print(f"   {result.get('full_transcription', 'N/A')}")
     
     if result.get('extraction_method'):
         print(f"\n[EXTRACTION METHOD] {result.get('extraction_method', 'LLM')}")
     
     if result.get('model'):
         print(f"[MODEL] {result.get('model', 'meta-llama/Llama-2-7b-chat-hf')}")
-    
-    if result.get('note'):
-        print(f"[NOTE] {result.get('note', 'N/A')}")
     
     print("="*60 + "\n")
 

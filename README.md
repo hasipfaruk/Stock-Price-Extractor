@@ -1,26 +1,24 @@
 # Stock Index Price Extractor
 
-A powerful, **100% open-source** solution for extracting stock index price information from audio recordings using **Llama 2** LLM and **Whisper Large-v3** ASR. Designed to handle complex audio with multiple information. Works with any audio source containing stock market information.
+A powerful, **100% open-source** solution for extracting stock index price information from audio recordings using **Llama 2** LLM and **Whisper** ASR. Optimized for speed and accuracy with proper JSON output format.
 
-## 📋 Recent Updates (Phase 1)
+## 📋 Recent Updates
 
-✅ **100% LLM-Only Enforcement** - Regex extraction completely removed, LLM mandatory  
-✅ **Testing Infrastructure** - Accuracy and latency validation tools included  
-✅ **Comprehensive Documentation** - Complete guides for deployment and validation  
-
-**See [PHASE4_COMPLETE.md](PHASE4_COMPLETE.md) for Phase 1 details**
+✅ **Optimized Output Format** - Client-required JSON structure with `quote_analysis` object  
+✅ **Speed Optimizations** - Faster processing with optimized prompts and parameters  
+✅ **Unique Extraction** - Each transcript extracts unique values (no copying)  
+✅ **Proper Data Types** - Numbers as numbers, not strings  
+✅ **100% LLM-Only** - No regex fallbacks, purely LLM-based extraction  
 
 ## 🔒 Client Requirements Compliance
 
 ✅ **Open-Source Only** - Llama 2 instruction-tuned models (NO OpenAI/Gemini/proprietary models)  
-✅ **GPU Optimized** - vLLM with FP16, prefix caching, <3s end-to-end latency  
-✅ **High-Quality ASR** - Whisper Large-v3 for accurate transcription  
+✅ **GPU Optimized** - vLLM with FP16, optimized for fast processing  
+✅ **High-Quality ASR** - Whisper Small/Medium for accurate transcription  
 ✅ **100% LLM Extraction** - NO regex fallbacks, purely LLM-based natural language understanding  
-✅ **Robust Validation** - Data normalization & strict output structure  
+✅ **Standardized Output** - Client-required JSON format with all fields  
 
-**[See CLIENT_COMPLIANCE.md](CLIENT_COMPLIANCE.md) for detailed requirement verification**
-
-⚠️ **IMPORTANT: NO REGEX EXTRACTION** - This solution uses **100% LLM-only** extraction (Llama 2) to handle complex audio transcripts with detailed information. A custom extraction prompt is **REQUIRED** for all extraction operations.
+⚠️ **IMPORTANT: PROMPT REQUIRED** - This solution uses **100% LLM-only** extraction (Llama 2). A custom extraction prompt file (`example_prompt.txt`) is **REQUIRED** for all extraction operations.
 
 ## 🚀 Quick Start
 
@@ -49,59 +47,59 @@ streamlit run streamlit_app.py
 - Automatic LLM extraction (Llama 2)
 - View results instantly
 - Download results as JSON
+- Batch processing support
 
-**Note**: Prompt is **REQUIRED** for LLM extraction. The app uses 100% LLM-only mode with no regex fallback.
+**Note**: Prompt file (`example_prompt.txt`) is **REQUIRED** for LLM extraction.
 
 #### 2. **Command Line (CLI)** - For single files
-```bash
-# With LLM (prompt REQUIRED - no regex fallback)
-python extract_price.py audio.wav --prompt-file prompt.txt
 
-# With prompt text
-python extract_price.py audio.wav --prompt-text "Extract stock prices..."
+```bash
+# Basic usage (prompt file required)
+python extract_price.py audio.wav --prompt-file example_prompt.txt
 
 # JSON output
-python extract_price.py audio.wav --prompt-file prompt.txt --json
+python extract_price.py audio.wav --prompt-file example_prompt.txt --json
 
 # Verbose with timing
-python extract_price.py audio.wav --prompt-file prompt.txt --verbose
+python extract_price.py audio.wav --prompt-file example_prompt.txt --verbose
 
 # Save to file
-python extract_price.py audio.wav --use-llm --prompt-file prompt.txt --output result.json
+python extract_price.py audio.wav --prompt-file example_prompt.txt --output result.json
 ```
 
 #### 3. **Python Library** - Use in your own code
+
 ```python
 from app.models.transcribe import transcribe
-from app.models.extract import extract_detailed
 from app.models.llm_extract import extract_with_long_prompt
 
 # Transcribe audio
 result = transcribe("audio.wav")
-transcript = result['result']
+transcript = result['result'] if isinstance(result, dict) else result
 
-# Extract using regex
-extraction = extract_detailed(transcript)
-print(extraction['index_name'], extraction['price'])
+# Extract using LLM (prompt file required)
+extraction = extract_with_long_prompt(
+    transcript, 
+    prompt_file="example_prompt.txt"
+)
 
-# Or use LLM extraction
-llm_result = extract_with_long_prompt(transcript, prompt_file="prompt.txt")
-print(llm_result['index_name'], llm_result['price'])
+# Access results
+print(extraction['index_name'])
+print(extraction['quote_analysis']['current_price'])
+print(extraction['quote_analysis']['change_points'])
 ```
-
 
 ## 📋 Features
 
-- ✅ **100% Open-Source**: Llama 2 + Whisper Large-v3 (NO proprietary models)
-- ✅ **GPU-Optimized**: vLLM with FP16, prefix caching, <3s end-to-end latency
+- ✅ **100% Open-Source**: Llama 2 + Whisper (NO proprietary models)
+- ✅ **GPU-Optimized**: vLLM with FP16, optimized for speed
 - ✅ **LLM Extraction**: Full natural language understanding of price expressions
 - ✅ **Robust Validation**: Data normalization with strict output structure
-- ✅ **Two Usage Modes**: CLI tool or Python library
-- ✅ **Fast Processing**: Optimized for < 3 second processing on GPU
+- ✅ **Fast Processing**: Optimized prompts and parameters for speed
 - ✅ **Cross-Platform**: Works on Windows, Linux, and macOS
 - ✅ **CPU/GPU Support**: Auto-detects and optimizes for your hardware
 - ✅ **Local Models**: All models stored in project directory
-- ✅ **Easy Integration**: Use as CLI tool or Python library
+- ✅ **Batch Processing**: Process multiple files at once
 
 ## 📁 Project Structure
 
@@ -109,47 +107,113 @@ print(llm_result['index_name'], llm_result['price'])
 bloomberg-audio-price-extractor/
 ├── extract_price.py          # CLI tool
 ├── streamlit_app.py          # Web interface
+├── example_prompt.txt        # Extraction prompt (REQUIRED)
 ├── app/
 │   ├── config.py             # Configuration
 │   ├── __init__.py
 │   └── models/
 │       ├── transcribe.py     # Whisper transcription
-│       ├── extract.py        # Regex extraction
 │       ├── llm_extract.py    # LLM extraction
 │       ├── normalize.py      # Data normalization
 │       ├── post_process.py   # Post-processing
 │       ├── utils.py          # Utility functions
 │       └── __init__.py
 ├── models/                   # Downloaded models stored here
+├── audios/                   # Audio files directory
 ├── requirements.txt
 └── README.md
 ```
 
-## 🎯 Use Cases
+## 📊 Output Format
 
-### 1. Quick One-Time Extraction
-```bash
-python extract_price.py recording.wav
+The system returns JSON in the following format:
+
+```json
+{
+  "full_transcription": "S&P futures up 12 points in pre-market trading.",
+  "standardized_quote": "S&P 500 FUTURES +12 pts PREMARKET",
+  "index_name": "S&P 500",
+  "quote_analysis": {
+    "current_price": null,
+    "change_points": 12,
+    "change_percent": null,
+    "intraday_high": null,
+    "intraday_low": null,
+    "market_direction": "up",
+    "session_context": "premarket"
+  }
+}
 ```
 
-### 2. With LLM Extraction
-```bash
-python extract_price.py recording.wav --use-llm --prompt-file prompt.txt
+### Output Fields
+
+- **`full_transcription`**: Complete transcribed text from audio
+- **`standardized_quote`**: Formatted quote string following client rules
+- **`index_name`**: Primary index name (e.g., "S&P 500", "DOW", "NASDAQ")
+- **`quote_analysis`**: Object containing:
+  - **`current_price`**: Current index level/price (number or null)
+  - **`change_points`**: Change in points (number, positive or negative, or null)
+  - **`change_percent`**: Change in percentage (number, positive or negative, or null)
+  - **`intraday_high`**: Intraday high if mentioned (number or null)
+  - **`intraday_low`**: Intraday low if mentioned (number or null)
+  - **`market_direction`**: "up", "down", or "flat" (or null)
+  - **`session_context`**: "opening", "midday", "closing", "premarket", "afterhours" (or null)
+
+### Example Outputs
+
+**Example 1: S&P 500 with price and change**
+```json
+{
+  "full_transcription": "It's in B500 up 23 points, that's 0.5% higher at 4212.",
+  "standardized_quote": "S&P 500 @ 4212 +23 pts (+0.5%)",
+  "index_name": "S&P 500",
+  "quote_analysis": {
+    "current_price": 4212,
+    "change_points": 23,
+    "change_percent": 0.5,
+    "intraday_high": null,
+    "intraday_low": null,
+    "market_direction": "up",
+    "session_context": null
+  }
+}
 ```
 
-### 3. Batch Processing
-```python
-from app.models.transcribe import transcribe
-from app.models.extract import extract_detailed
-from pathlib import Path
-
-for audio_file in Path(".").glob("*.wav"):
-    result = transcribe(str(audio_file))
-    transcript = result['result']
-    extraction = extract_detailed(transcript)
-    print(f"{audio_file}: {extraction['index_name']} @ {extraction['price']}")
+**Example 2: Dow Jones closing**
+```json
+{
+  "full_transcription": "Dow Jones closing down 58 points at 34,020.",
+  "standardized_quote": "DOW @ 34020 -58 pts CLOSING",
+  "index_name": "DOW",
+  "quote_analysis": {
+    "current_price": 34020,
+    "change_points": -58,
+    "change_percent": null,
+    "intraday_high": null,
+    "intraday_low": null,
+    "market_direction": "down",
+    "session_context": "closing"
+  }
+}
 ```
 
+**Example 3: Session high/low**
+```json
+{
+  "full_transcription": "S&P session high, 4250, session low, 4200, currently at 4225.",
+  "standardized_quote": "S&P 500 HIGH 4250 LOW 4200 @ 4225",
+  "index_name": "S&P 500",
+  "quote_analysis": {
+    "current_price": 4225,
+    "change_points": null,
+    "change_percent": null,
+    "intraday_high": 4250,
+    "intraday_low": 4200,
+    "market_direction": null,
+    "session_context": null
+  }
+}
+```
 
 ## ⚙️ Configuration
 
@@ -157,129 +221,171 @@ Edit `app/config.py` to customize:
 
 ```python
 # Model selection
-MODEL_TRANSCRIBE = "openai/whisper-large-v3"  # High accuracy
-# Or use: "openai/whisper-medium" for speed
+MODEL_TRANSCRIBE = "openai/whisper-small"  # Fast (default)
+# Or use: "openai/whisper-medium" for better accuracy
 
-# Device
+# LLM model
+LLM_MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf"
+
+# Device (auto-detected)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-```
 
-## 📊 Output Format
-
-Example output from CLI:
-
-```
-==================================================
-STOCK PRICE EXTRACTION RESULTS
-==================================================
-
-[INDEX] Index: S&P 500
-[PRICE] Price: 4500.25
-[CHANGE] Change: +50.10
-[CHANGE %] Change %: +1.12%
-[SESSION] Session: CLOSING
-
-[QUOTE] S&P 500 trading at 4500.25, up 1.12%
-==================================================
-```
-
-JSON output:
-
-```json
-{
-  "index_name": "S&P 500",
-  "price": "4500.25",
-  "change": "+50.10",
-  "change_percent": "+1.12%",
-  "session": "CLOSING",
-  "standardized_quote": "S&P 500 trading at 4500.25, up 1.12%",
-  "transcript": "The S&P 500 is up ...",
-  "extraction_method": "regex"
-}
+# Performance targets
+TARGET_LATENCY_SECONDS = 5.0
+TARGET_TRANSCRIBE_SECONDS = 2.5
+TARGET_LLM_SECONDS = 2.5
 ```
 
 ## 🔧 Requirements
 
 - Python 3.8+
-- 4GB+ RAM (8GB recommended)
-- ~500MB disk space for models
-- CUDA GPU (optional, for faster processing)
+- 8GB+ RAM (16GB recommended for Llama 2)
+- ~20GB disk space for models
+- CUDA GPU (recommended, for faster processing)
+- Hugging Face account with Llama 2 access
 
 ## 📦 Installation Details
 
-Dependencies:
+### Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+Key dependencies:
 - `torch` - PyTorch for model inference
 - `transformers` - Hugging Face transformers
 - `librosa` - Audio processing
-- `streamlit` - Web interface
-- `vllm` - GPU-optimized inference (optional)
+- `streamlit` - Web interface (optional)
+- `vllm` - GPU-optimized inference (optional, for GPU)
+
+### Models
 
 Models are automatically downloaded on first use:
-- Whisper Large-v3: ~1.5 GB
-- Llama 2 7B: ~14 GB (for LLM extraction)
+- **Whisper Small**: ~500 MB (fast, default)
+- **Whisper Medium**: ~1.5 GB (better accuracy)
+- **Llama 2 7B Chat**: ~14 GB (for LLM extraction)
 
-## 🎓 Quick Examples
+**Note**: Llama 2 requires:
+1. Accepting Meta's license: https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
+2. Hugging Face token: https://huggingface.co/settings/tokens
 
-CLI:
+## 🎓 Usage Examples
 
-```bash
-python extract_price.py audio.wav --verbose
-python extract_price.py audio.wav --use-llm --prompt-file prompt.txt
-```
-
-Web App:
+### CLI Examples
 
 ```bash
-streamlit run streamlit_app.py
+# Single file with JSON output
+python extract_price.py audio.wav --prompt-file example_prompt.txt --json
+
+# Verbose output with timing
+python extract_price.py audio.wav --prompt-file example_prompt.txt --verbose
+
+# Save to file
+python extract_price.py audio.wav --prompt-file example_prompt.txt --output result.json
 ```
 
-Python Library:
+### Python Library Examples
 
 ```python
 from app.models.transcribe import transcribe
-from app.models.extract import extract_detailed
+from app.models.llm_extract import extract_with_long_prompt
 
+# Process single file
 result = transcribe("audio.wav")
-extraction = extract_detailed(result['result'])
-print(extraction['index_name'], extraction['price'])
+transcript = result['result'] if isinstance(result, dict) else result
+
+extraction = extract_with_long_prompt(transcript, prompt_file="example_prompt.txt")
+
+# Access data
+print(f"Index: {extraction['index_name']}")
+print(f"Price: {extraction['quote_analysis']['current_price']}")
+print(f"Change: {extraction['quote_analysis']['change_points']}")
+
+# Batch processing
+from pathlib import Path
+
+results = {}
+for audio_file in Path("audios").glob("*.wav"):
+    result = transcribe(str(audio_file))
+    transcript = result['result'] if isinstance(result, dict) else result
+    extraction = extract_with_long_prompt(transcript, prompt_file="example_prompt.txt")
+    results[audio_file.name] = extraction
 ```
 
 ## 🚀 Performance
 
-**Target: < 3 seconds end-to-end processing**
+**Target: < 5 seconds end-to-end processing per file**
 
-CPU (Whisper Medium):
-- Typical: 1-2 seconds
+### GPU (Recommended)
+- **Transcription**: ~1-2 seconds (Whisper Small)
+- **LLM Extraction**: ~2-3 seconds (Llama 2 7B)
+- **Total**: ~3-5 seconds per file
 
-GPU (Whisper Large-v3):
-- Typical: 0.5-1 second
+### CPU
+- **Transcription**: ~2-4 seconds
+- **LLM Extraction**: ~5-10 seconds
+- **Total**: ~7-14 seconds per file
 
-Use `--verbose` flag to see timing details.
+Use `--verbose` flag to see detailed timing information.
 
-## 📚 Documentation
+## 📝 Prompt File
 
-All essential documentation is in this README. For model details, see `app/config.py`.
+The `example_prompt.txt` file contains the extraction instructions for the LLM. It defines:
+- Output JSON format
+- Index name standardization rules
+- Number extraction rules
+- Market direction detection
+- Session context extraction
+
+**Important**: Do not modify the prompt structure unless you understand the impact. The prompt is optimized for the client's required output format.
 
 ## 🛠️ Development
 
-Test the pipeline:
+### Test the Pipeline
 
 ```bash
-python extract_price.py test_audio.wav --verbose
+# Test with verbose output
+python extract_price.py test_audio.wav --prompt-file example_prompt.txt --verbose
 ```
 
-Benchmark performance:
+### Batch Processing
 
-```bash
-python extract_price.py audio.wav --verbose
+```python
+from pathlib import Path
+import json
+from app.models.transcribe import transcribe
+from app.models.llm_extract import extract_with_long_prompt
+
+audio_files = list(Path("audios").glob("*.wav"))
+results = {}
+
+for audio_file in audio_files:
+    # Transcribe
+    result = transcribe(str(audio_file))
+    transcript = result['result'] if isinstance(result, dict) else result
+    
+    # Extract
+    extraction = extract_with_long_prompt(transcript, prompt_file="example_prompt.txt")
+    results[audio_file.name] = extraction
+
+# Save results
+with open("batch_results.json", "w") as f:
+    json.dump(results, f, indent=2)
 ```
 
+## 📚 Documentation
+
+- **Configuration**: See `app/config.py` for model and performance settings
+- **Model Caching**: See `MODEL_CACHING.md` for caching information
+- **Speed Optimizations**: See `SPEED_OPTIMIZATIONS.md` for performance tips
 
 ## 📝 License
 
 This project uses open-source models:
-- Whisper: MIT License
-- Transformers: Apache 2.0
+- **Whisper**: MIT License
+- **Transformers**: Apache 2.0
+- **Llama 2**: Custom License (requires acceptance)
 
 ## 🤝 Contributing
 
@@ -292,4 +398,3 @@ For questions or issues, please open an issue on the repository.
 ---
 
 **Made for everyone** - Use it as a CLI tool, Python library, or web service! 🎉
-
